@@ -1,4 +1,13 @@
 items:
+  - id: ml_hsi_io_device_stream_consumer
+    title: Consume linux_io_device_simul slot stream output
+    status: done
+  - id: ml_hsi_cross_repo_pipeline
+    title: Add trigger script loop to joint prediction pipeline test
+    status: done
+  - id: ml_hsi_55_joint_predictor
+    title: Expand predictor to 55 human joint outputs
+    status: done
   - id: ml_hsi_io_adapter
     title: Map IO simulator events to motion controls
     status: done

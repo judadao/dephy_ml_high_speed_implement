@@ -7,10 +7,12 @@ out="${OUTDIR:-build_out}/joint_replay.csv"
 grep -q '^frame_t_ms,joint,confidence,rx,ry,rz,px,py,pz' "$out"
 grep -q ',left_knee,' "$out"
 grep -q ',right_ankle,' "$out"
+grep -q ',left_thumb_1,' "$out"
+grep -q ',right_toe,' "$out"
 grep -q '^300,root,' "$out"
 
 lines="$(wc -l < "$out")"
-test "$lines" -gt 600
+test "$lines" -gt 1800
 
 event_out="${OUTDIR:-build_out}/joint_replay_event.csv"
 "${OUTDIR:-build_out}/dephy_joint_replay" --samples 2 --event 1:ai:1:80 --event 2:di:3:1 > "$event_out"

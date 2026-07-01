@@ -7,7 +7,7 @@ OUTDIR  ?= build_out
 LIB := $(OUTDIR)/libdephy_ml_high_speed_implement.a
 OBJS := $(OUTDIR)/src/bitmap_anim.o $(OUTDIR)/src/joint_predictor.o
 
-.PHONY: all structure-audit direct-test test zephyr-metadata demo web-install web-build web web-render-check clean
+.PHONY: all structure-audit direct-test test io-device-pipeline-check zephyr-metadata demo web-install web-build web web-render-check clean
 
 all: $(LIB) $(OUTDIR)/dephy_bitmap_anim $(OUTDIR)/dephy_joint_replay
 
@@ -48,6 +48,9 @@ direct-test: $(OUTDIR)/unit_bitmap_anim $(OUTDIR)/unit_joint_predictor $(OUTDIR)
 	OUTDIR=$(OUTDIR) sh scripts/test_joint_replay.sh
 
 test: direct-test
+
+io-device-pipeline-check: $(OUTDIR)/dephy_joint_replay
+	OUTDIR=$(OUTDIR) sh scripts/test_io_device_pipeline.sh
 
 demo: $(OUTDIR)/dephy_bitmap_anim
 	$(OUTDIR)/dephy_bitmap_anim --out $(OUTDIR)/demo_frames --frames 16 --width 128 --height 96 --cycles 1

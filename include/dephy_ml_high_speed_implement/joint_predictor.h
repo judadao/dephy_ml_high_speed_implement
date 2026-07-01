@@ -8,8 +8,8 @@
 extern "C" {
 #endif
 
-#define DEPHY_JOINT_COUNT 19
-#define DEPHY_IO_FEATURE_COUNT 8
+#define DEPHY_JOINT_COUNT 55
+#define DEPHY_IO_FEATURE_COUNT 32
 
 typedef enum {
     DEPHY_JOINT_ROOT = 0,
@@ -31,6 +31,40 @@ typedef enum {
     DEPHY_JOINT_RIGHT_KNEE,
     DEPHY_JOINT_RIGHT_ANKLE,
     DEPHY_JOINT_CENTER_MASS,
+    DEPHY_JOINT_SPINE_2,
+    DEPHY_JOINT_LEFT_CLAVICLE,
+    DEPHY_JOINT_RIGHT_CLAVICLE,
+    DEPHY_JOINT_JAW,
+    DEPHY_JOINT_LEFT_EYE,
+    DEPHY_JOINT_RIGHT_EYE,
+    DEPHY_JOINT_LEFT_THUMB_0,
+    DEPHY_JOINT_LEFT_THUMB_1,
+    DEPHY_JOINT_LEFT_INDEX_0,
+    DEPHY_JOINT_LEFT_INDEX_1,
+    DEPHY_JOINT_LEFT_MIDDLE_0,
+    DEPHY_JOINT_LEFT_MIDDLE_1,
+    DEPHY_JOINT_LEFT_RING_0,
+    DEPHY_JOINT_LEFT_RING_1,
+    DEPHY_JOINT_LEFT_PINKY_0,
+    DEPHY_JOINT_LEFT_PINKY_1,
+    DEPHY_JOINT_RIGHT_THUMB_0,
+    DEPHY_JOINT_RIGHT_THUMB_1,
+    DEPHY_JOINT_RIGHT_INDEX_0,
+    DEPHY_JOINT_RIGHT_INDEX_1,
+    DEPHY_JOINT_RIGHT_MIDDLE_0,
+    DEPHY_JOINT_RIGHT_MIDDLE_1,
+    DEPHY_JOINT_RIGHT_RING_0,
+    DEPHY_JOINT_RIGHT_RING_1,
+    DEPHY_JOINT_RIGHT_PINKY_0,
+    DEPHY_JOINT_RIGHT_PINKY_1,
+    DEPHY_JOINT_LEFT_HEEL,
+    DEPHY_JOINT_LEFT_TOE,
+    DEPHY_JOINT_RIGHT_HEEL,
+    DEPHY_JOINT_RIGHT_TOE,
+    DEPHY_JOINT_LEFT_SCAPULA,
+    DEPHY_JOINT_RIGHT_SCAPULA,
+    DEPHY_JOINT_LEFT_FOREARM_TWIST,
+    DEPHY_JOINT_RIGHT_FOREARM_TWIST,
 } dephy_joint_id_t;
 
 typedef struct {
@@ -58,6 +92,30 @@ typedef struct {
     float arm_drive;
     float leg_drive;
     float relay_lock;
+    float left_arm_enable;
+    float right_arm_enable;
+    float left_leg_enable;
+    float right_leg_enable;
+    float left_hand_grip;
+    float right_hand_grip;
+    float left_foot_pressure;
+    float right_foot_pressure;
+    float torso_pitch;
+    float head_yaw;
+    float balance_x;
+    float balance_z;
+    float cadence_target;
+    float knee_lift;
+    float ankle_push;
+    float shoulder_roll;
+    float elbow_bend;
+    float wrist_twist;
+    float hip_sway;
+    float spine_twist;
+    float toe_curl;
+    float prediction_aggression;
+    float observed_error;
+    float safety_hold;
 } dephy_io_motion_sample_t;
 
 typedef struct {

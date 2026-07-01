@@ -5,8 +5,9 @@ High-speed bitmap and 3D joint motion implementation for controllable character 
 The repo has two paths:
 
 - Generate bitmap or indexed matrix animation frames from the command line.
-- Replay slow IO samples into a named 3D joint timeline and predict smooth
-  motion frames between sparse IO updates.
+- Consume slow IO samples emitted by `linux_io_device_simul`, convert them into
+  a named 3D joint timeline, and predict smooth motion frames between sparse IO
+  updates.
 
 This is aimed at machines like a UC-4510-class Linux edge controller where IO
 polling or upstream protocol traffic may only arrive every 300ms. The simulator
@@ -91,7 +92,9 @@ Expected future mapping:
 ## 3D Control Sandbox
 
 The `web/` app is a Vite + React + Three.js sandbox for controlling a named
-19-joint runner rig.
+runner rig. The C predictor currently emits 55 joints including spine segments,
+clavicles, scapula points, fingers, heels, toes, forearm twist joints, and the
+major arm/leg joints.
 
 ```sh
 make -f Makefile.linux web-install
@@ -109,13 +112,28 @@ anchors and the number of predicted frames generated between anchors.
 The C predictor receives slow IO samples from `linux_io_device_simul` style
 events and predicts smooth intermediate joint frames.
 
+Full pipeline from the sibling IO simulator repo:
+
+```sh
+../linux_io_device_simul/build_out/linux_io_device_simul \
+  --slot-stream \
+  --loop 2 \
+  --sample-ms 300 \
+  ../linux_io_device_simul/scripts/motion_pipeline.trigger \
+  | build_out/dephy_joint_replay --from-io-stream > build_out/joints.csv
+```
+
+The IO simulator remains responsible for looping required node actions at a
+slow sample cadence. This repo treats those events as observed anchors and
+generates 16ms/33ms predicted joint frames between anchors.
+
 Replay a sparse IO timeline:
 
 ```sh
 build_out/dephy_joint_replay --render-ms 16 --io-ms 300 --samples 4 > build_out/joints.csv
 ```
 
-Replay with slot/type/channel/value events:
+Replay with direct slot/type/channel/value events:
 
 ```sh
 build_out/dephy_joint_replay --samples 2 --event 1:di:1:1 --event 2:ai:1:80 --event 3:ai:2:65
@@ -131,9 +149,15 @@ Event mapping:
 - `ai/ao channel 3`: arm drive.
 - `ai/ao channel 4`: leg drive.
 - `relay channel 1`: motion lock.
+- `di/do channels 4-8`: limb enable and safety hold gates.
+- `ai/ao channels 5-16`: hand grip, foot pressure, torso/head/balance,
+  cadence, knee lift, ankle push, and shoulder roll.
+- `relay channels 2-8`: elbow bend, wrist twist, hip sway, spine twist, toe
+  curl, prediction aggression, and observed error flags.
 
-The current predictor has a deterministic gait baseline, linear interpolation
-between 300ms anchors, confidence scoring, and a small residual learner API.
+The current predictor has a deterministic 55-joint gait baseline, linear
+interpolation between 300ms anchors, confidence scoring, and a small residual
+learner API.
 The residual learner observes target joint-frame error and applies an EMA
 correction, giving the repo a tested fallback path before a larger ML model is
 introduced.

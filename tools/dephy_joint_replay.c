@@ -25,7 +25,7 @@ static int parse_arg_u32(const char *text, uint32_t *out)
 static void print_usage(const char *argv0)
 {
     fprintf(stderr,
-            "usage: %s [--render-ms 16] [--io-ms 300] [--samples 4] [--turn-left|--turn-right] [--event slot:type:channel:value]\n",
+            "usage: %s [--render-ms 16] [--io-ms 300] [--samples 4] [--turn-left|--turn-right] [--event slot:type:channel:value] [--from-io-stream [FILE]]\n",
             argv0);
 }
 
@@ -81,6 +81,91 @@ static int parse_event(char *text, dephy_io_event_t *event)
     return 0;
 }
 
+static int parse_json_number(const char *line, const char *key, float *out)
+{
+    const char *pos;
+    char pattern[48];
+
+    if (!line || !key || !out) {
+        return -1;
+    }
+
+    if (snprintf(pattern, sizeof(pattern), "\"%s\":", key) >= (int)sizeof(pattern)) {
+        return -1;
+    }
+    pos = strstr(line, pattern);
+    if (!pos) {
+        return -1;
+    }
+    pos += strlen(pattern);
+    *out = (float)atof(pos);
+    return 0;
+}
+
+static int parse_json_string(const char *line, const char *key, char *out, size_t out_size)
+{
+    const char *pos;
+    const char *end;
+    char pattern[48];
+    size_t len;
+
+    if (!line || !key || !out || out_size == 0) {
+        return -1;
+    }
+
+    if (snprintf(pattern, sizeof(pattern), "\"%s\":\"", key) >= (int)sizeof(pattern)) {
+        return -1;
+    }
+    pos = strstr(line, pattern);
+    if (!pos) {
+        return -1;
+    }
+    pos += strlen(pattern);
+    end = strchr(pos, '"');
+    if (!end) {
+        return -1;
+    }
+    len = (size_t)(end - pos);
+    if (len >= out_size) {
+        len = out_size - 1;
+    }
+    memcpy(out, pos, len);
+    out[len] = '\0';
+    return 0;
+}
+
+static int parse_stream_event(const char *line, dephy_io_event_t *event, uint32_t *t_ms)
+{
+    char kind_text[16];
+    float value;
+
+    if (!line || !event || !t_ms) {
+        return -1;
+    }
+    memset(event, 0, sizeof(*event));
+
+    if (parse_json_number(line, "slot", &value) != 0 || value < 1.0f || value > 20.0f) {
+        return -1;
+    }
+    event->slot = (uint8_t)value;
+    if (parse_json_string(line, "type", kind_text, sizeof(kind_text)) != 0 ||
+        parse_io_kind(kind_text, &event->kind) != 0) {
+        return -1;
+    }
+    if (parse_json_number(line, "channel", &value) != 0 || value < 0.0f || value > 65535.0f) {
+        return -1;
+    }
+    event->channel = (uint16_t)value;
+    if (parse_json_number(line, "value", &event->value) != 0) {
+        return -1;
+    }
+    if (parse_json_number(line, "t_ms", &value) != 0 || value < 0.0f) {
+        return -1;
+    }
+    *t_ms = (uint32_t)value;
+    return 0;
+}
+
 static void write_frame_csv(const dephy_joint_frame_t *frame)
 {
     int i;
@@ -99,12 +184,59 @@ static void write_frame_csv(const dephy_joint_frame_t *frame)
     }
 }
 
+static int replay_io_stream(FILE *input, const dephy_joint_predictor_config_t *config)
+{
+    char line[512];
+    dephy_io_motion_sample_t previous = dephy_io_motion_sample_default(0);
+    dephy_io_motion_sample_t current = previous;
+    int have_previous = 0;
+
+    printf("frame_t_ms,joint,confidence,rx,ry,rz,px,py,pz\n");
+    while (fgets(line, sizeof(line), input)) {
+        dephy_io_event_t event;
+        uint32_t t_ms;
+
+        if (parse_stream_event(line, &event, &t_ms) != 0) {
+            continue;
+        }
+
+        current.t_ms = t_ms;
+        if (dephy_io_motion_sample_apply_event(&current, &event) != 0) {
+            return 1;
+        }
+
+        if (have_previous) {
+            dephy_joint_frame_t frames[128];
+            size_t count = dephy_joint_predict_interval(config,
+                                                        &previous,
+                                                        &current,
+                                                        frames,
+                                                        sizeof(frames) / sizeof(frames[0]));
+            size_t j;
+
+            for (j = 0; j < count; ++j) {
+                if (j == 0) {
+                    continue;
+                }
+                write_frame_csv(&frames[j]);
+            }
+        }
+
+        previous = current;
+        have_previous = 1;
+    }
+
+    return have_previous ? 0 : 1;
+}
+
 int main(int argc, char **argv)
 {
     dephy_joint_predictor_config_t config = dephy_joint_predictor_default_config();
     uint32_t samples = 4;
     dephy_io_event_t events[16];
     size_t event_count = 0;
+    const char *stream_path = 0;
+    int from_io_stream = 0;
     int turn_left = 0;
     int turn_right = 0;
     int i;
@@ -135,10 +267,33 @@ int main(int argc, char **argv)
                 return 2;
             }
             ++event_count;
+        } else if (strcmp(argv[i], "--from-io-stream") == 0) {
+            from_io_stream = 1;
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                stream_path = argv[++i];
+            }
         } else {
             print_usage(argv[0]);
             return 2;
         }
+    }
+
+    if (from_io_stream) {
+        FILE *input = stdin;
+        int result;
+
+        if (stream_path) {
+            input = fopen(stream_path, "r");
+            if (!input) {
+                perror(stream_path);
+                return 1;
+            }
+        }
+        result = replay_io_stream(input, &config);
+        if (input != stdin) {
+            fclose(input);
+        }
+        return result;
     }
 
     printf("frame_t_ms,joint,confidence,rx,ry,rz,px,py,pz\n");
