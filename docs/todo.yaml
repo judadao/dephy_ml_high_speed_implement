@@ -1,0 +1,11 @@
+items:
+  - id: ml_hsi_io_adapter
+    title: Map IO simulator events to motion controls
+    status: open
+  - id: ml_hsi_matrix_output
+    title: Add matrix-oriented indexed bitmap output
+    status: open
+  - id: ml_hsi_benchmark
+    title: Add high frame-count generation benchmark
+    status: open
+

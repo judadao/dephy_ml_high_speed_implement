@@ -1,0 +1,7 @@
+build_out/
+*.o
+*.a
+out/
+web/node_modules/
+web/dist/
+

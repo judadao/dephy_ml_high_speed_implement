@@ -1,0 +1,19 @@
+{
+  "repo_type": "module",
+  "name": "dephy_ml_high_speed_implement",
+  "description": "High-speed bitmap animation generator for controllable character motion, intended for later IO-device simulator integration.",
+  "module_kind": "linux_tooling",
+  "product_dependency_allowed": true,
+  "license": "MIT",
+  "repo": "git@github.com:judadao/dephy_ml_high_speed_implement.git",
+  "attribution_notice": "Copyright notice and attribution to Judd (judadao) must be preserved.",
+  "topics": [
+    "dephy",
+    "bitmap-animation",
+    "motion-control",
+    "io-simulator",
+    "c11",
+    "linux-cli"
+  ]
+}
+

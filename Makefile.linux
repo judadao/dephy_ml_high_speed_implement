@@ -1,0 +1,57 @@
+CC      ?= gcc
+AR      ?= ar
+CFLAGS  ?= -Wall -Wextra -std=c11 -g
+LDFLAGS ?= -lm
+OUTDIR  ?= build_out
+
+LIB := $(OUTDIR)/libdephy_ml_high_speed_implement.a
+OBJS := $(OUTDIR)/src/bitmap_anim.o
+
+.PHONY: all structure-audit direct-test test zephyr-metadata demo web-install web-build web web-render-check clean
+
+all: $(LIB) $(OUTDIR)/dephy_bitmap_anim
+
+$(OUTDIR):
+	mkdir -p $(OUTDIR)/src
+
+$(OUTDIR)/src/bitmap_anim.o: src/bitmap_anim.c include/dephy_ml_high_speed_implement/bitmap_anim.h | $(OUTDIR)
+	$(CC) $(CFLAGS) -Iinclude -c $< -o $@
+
+$(LIB): $(OBJS)
+	$(AR) rcs $@ $^
+
+$(OUTDIR)/unit_bitmap_anim: tests/unit_bitmap_anim.c src/bitmap_anim.c include/dephy_ml_high_speed_implement/bitmap_anim.h | $(OUTDIR)
+	$(CC) $(CFLAGS) -Iinclude tests/unit_bitmap_anim.c src/bitmap_anim.c $(LDFLAGS) -o $@
+
+$(OUTDIR)/dephy_bitmap_anim: tools/dephy_bitmap_anim.c src/bitmap_anim.c include/dephy_ml_high_speed_implement/bitmap_anim.h | $(OUTDIR)
+	$(CC) $(CFLAGS) -Iinclude tools/dephy_bitmap_anim.c src/bitmap_anim.c $(LDFLAGS) -o $@
+
+structure-audit:
+	./scripts/audit_module_structure.sh .
+
+zephyr-metadata:
+	./scripts/test_zephyr_module.sh --metadata-only
+
+direct-test: $(OUTDIR)/unit_bitmap_anim $(OUTDIR)/dephy_bitmap_anim structure-audit zephyr-metadata
+	$(OUTDIR)/unit_bitmap_anim
+	OUTDIR=$(OUTDIR) sh scripts/test_cli_generate.sh
+
+test: direct-test
+
+demo: $(OUTDIR)/dephy_bitmap_anim
+	$(OUTDIR)/dephy_bitmap_anim --out $(OUTDIR)/demo_frames --frames 16 --width 128 --height 96 --cycles 1
+
+web-install:
+	npm --prefix web install
+
+web-build:
+	npm --prefix web run build
+
+web:
+	npm --prefix web run dev -- --host 127.0.0.1 --port 8091
+
+web-render-check:
+	OUTDIR=$(OUTDIR) ./scripts/test_web_render.sh
+
+clean:
+	rm -rf $(OUTDIR)

@@ -1,0 +1,5 @@
+name: dephy_ml_high_speed_implement
+build:
+  cmake: zephyr
+  kconfig: zephyr/Kconfig
+

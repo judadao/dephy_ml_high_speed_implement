@@ -1,0 +1,10 @@
+menu "Dephy ML High Speed Implement"
+
+config DEPHY_ML_HIGH_SPEED_IMPLEMENT
+	bool "Enable Dephy ML high-speed bitmap implementation"
+	default n
+	help
+	  Enable the controllable bitmap animation generator module.
+
+endmenu
+
