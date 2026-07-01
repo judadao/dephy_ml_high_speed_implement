@@ -1,22 +1,25 @@
 items:
   - id: ml_hsi_io_adapter
     title: Map IO simulator events to motion controls
-    status: open
+    status: done
   - id: ml_hsi_matrix_output
     title: Add matrix-oriented indexed bitmap output
-    status: open
+    status: done
+  - id: ml_hsi_raw_stream_output
+    title: Add raw RGB frame streaming output
+    status: done
   - id: ml_hsi_benchmark
     title: Add high frame-count generation benchmark
-    status: open
+    status: done
   - id: ml_hsi_joint_schema
     title: Define IO sample and joint-frame schemas
-    status: open
+    status: done
   - id: ml_hsi_multijoint_rig
     title: Replace primitive runner with named multi-joint rig
-    status: open
+    status: done
   - id: ml_hsi_sparse_io_prediction
     title: Predict smooth joint frames between 300ms IO samples
-    status: open
+    status: done
   - id: ml_hsi_residual_learning
     title: Add residual learner with confidence and fallback behavior
-    status: open
+    status: done

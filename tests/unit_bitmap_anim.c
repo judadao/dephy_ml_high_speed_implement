@@ -44,10 +44,28 @@ static void test_motion_control_phase_wraps(void)
     assert(control.gait_phase < 1.0f);
 }
 
+static void test_indexed_matrix_quantizes_pixels(void)
+{
+    dephy_bitmap_frame_t frame;
+    dephy_indexed_frame_t indexed;
+    dephy_bitmap_rgb_t palette[] = {
+        { 0, 0, 0 },
+        { 255, 255, 255 },
+    };
+
+    assert(dephy_bitmap_frame_init(&frame, 4, 4) == 0);
+    assert(dephy_indexed_frame_init(&indexed, 4, 4) == 0);
+    dephy_bitmap_frame_clear(&frame, (dephy_bitmap_rgb_t){ 250, 250, 250 });
+    assert(dephy_bitmap_to_indexed_matrix(&frame, &indexed, palette, 2) == 0);
+    assert(indexed.indices[0] == 1);
+    dephy_indexed_frame_free(&indexed);
+    dephy_bitmap_frame_free(&frame);
+}
+
 int main(void)
 {
     test_render_runner_sets_pixels();
     test_motion_control_phase_wraps();
+    test_indexed_matrix_quantizes_pixels();
     return 0;
 }
-

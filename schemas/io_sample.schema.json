@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dephy.local/schemas/io_sample.schema.json",
+  "title": "Dephy IO Sample",
+  "type": "object",
+  "required": ["t_ms", "slot", "type", "channel", "value"],
+  "properties": {
+    "t_ms": { "type": "integer", "minimum": 0 },
+    "slot": { "type": "integer", "minimum": 1, "maximum": 20 },
+    "type": { "type": "string", "enum": ["DI", "DO", "AI", "AO", "RELAY"] },
+    "channel": { "type": "integer", "minimum": 1, "maximum": 16 },
+    "value": { "type": "number" }
+  }
+}
+

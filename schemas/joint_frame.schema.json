@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dephy.local/schemas/joint_frame.schema.json",
+  "title": "Dephy Joint Frame",
+  "type": "object",
+  "required": ["frame_t_ms", "source", "confidence", "joints"],
+  "properties": {
+    "frame_t_ms": { "type": "integer", "minimum": 0 },
+    "source": { "type": "string", "enum": ["observed", "predicted", "interpolated", "fallback"] },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "joints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["joint", "rx", "ry", "rz", "px", "py", "pz"],
+        "properties": {
+          "joint": { "type": "string" },
+          "rx": { "type": "number" },
+          "ry": { "type": "number" },
+          "rz": { "type": "number" },
+          "px": { "type": "number" },
+          "py": { "type": "number" },
+          "pz": { "type": "number" }
+        }
+      }
+    }
+  }
+}
+

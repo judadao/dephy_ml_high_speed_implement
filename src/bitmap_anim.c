@@ -111,6 +111,39 @@ void dephy_bitmap_frame_free(dephy_bitmap_frame_t *frame)
     frame->height = 0;
 }
 
+int dephy_indexed_frame_init(dephy_indexed_frame_t *frame, uint16_t width, uint16_t height)
+{
+    size_t count;
+
+    if (!frame || width == 0 || height == 0) {
+        return -1;
+    }
+
+    count = (size_t)width * height;
+    frame->indices = (uint8_t *)calloc(count, sizeof(uint8_t));
+    if (!frame->indices) {
+        frame->width = 0;
+        frame->height = 0;
+        return -1;
+    }
+
+    frame->width = width;
+    frame->height = height;
+    return 0;
+}
+
+void dephy_indexed_frame_free(dephy_indexed_frame_t *frame)
+{
+    if (!frame) {
+        return;
+    }
+
+    free(frame->indices);
+    frame->indices = 0;
+    frame->width = 0;
+    frame->height = 0;
+}
+
 void dephy_bitmap_frame_clear(dephy_bitmap_frame_t *frame, dephy_bitmap_rgb_t color)
 {
     size_t i;
@@ -218,6 +251,77 @@ int dephy_bitmap_write_ppm(const dephy_bitmap_frame_t *frame, const char *path)
 
     count = (size_t)frame->width * frame->height;
     if (fwrite(frame->pixels, sizeof(dephy_bitmap_rgb_t), count, fp) != count) {
+        fclose(fp);
+        return -1;
+    }
+
+    fclose(fp);
+    return 0;
+}
+
+static unsigned int color_distance_sq(dephy_bitmap_rgb_t a, dephy_bitmap_rgb_t b)
+{
+    int dr = (int)a.r - (int)b.r;
+    int dg = (int)a.g - (int)b.g;
+    int db = (int)a.b - (int)b.b;
+
+    return (unsigned int)(dr * dr + dg * dg + db * db);
+}
+
+int dephy_bitmap_to_indexed_matrix(const dephy_bitmap_frame_t *src,
+                                   dephy_indexed_frame_t *dst,
+                                   const dephy_bitmap_rgb_t *palette,
+                                   size_t palette_count)
+{
+    size_t i;
+    size_t total;
+
+    if (!src || !src->pixels || !dst || !dst->indices || !palette ||
+        palette_count == 0 || palette_count > 256 ||
+        dst->width != src->width || dst->height != src->height) {
+        return -1;
+    }
+
+    total = (size_t)src->width * src->height;
+    for (i = 0; i < total; ++i) {
+        size_t p;
+        size_t best = 0;
+        unsigned int best_distance = color_distance_sq(src->pixels[i], palette[0]);
+
+        for (p = 1; p < palette_count; ++p) {
+            unsigned int distance = color_distance_sq(src->pixels[i], palette[p]);
+            if (distance < best_distance) {
+                best = p;
+                best_distance = distance;
+            }
+        }
+        dst->indices[i] = (uint8_t)best;
+    }
+
+    return 0;
+}
+
+int dephy_indexed_write_pgm(const dephy_indexed_frame_t *frame, const char *path)
+{
+    FILE *fp;
+    size_t count;
+
+    if (!frame || !frame->indices || !path) {
+        return -1;
+    }
+
+    fp = fopen(path, "wb");
+    if (!fp) {
+        return -1;
+    }
+
+    if (fprintf(fp, "P5\n%u %u\n255\n", frame->width, frame->height) < 0) {
+        fclose(fp);
+        return -1;
+    }
+
+    count = (size_t)frame->width * frame->height;
+    if (fwrite(frame->indices, sizeof(uint8_t), count, fp) != count) {
         fclose(fp);
         return -1;
     }

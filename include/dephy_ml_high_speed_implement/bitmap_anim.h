@@ -21,6 +21,12 @@ typedef struct {
 } dephy_bitmap_frame_t;
 
 typedef struct {
+    uint16_t width;
+    uint16_t height;
+    uint8_t *indices;
+} dephy_indexed_frame_t;
+
+typedef struct {
     float gait_phase;
     float speed;
     float arm_drive;
@@ -45,6 +51,13 @@ void dephy_bitmap_frame_free(dephy_bitmap_frame_t *frame);
 void dephy_bitmap_frame_clear(dephy_bitmap_frame_t *frame, dephy_bitmap_rgb_t color);
 int dephy_bitmap_render_runner(dephy_bitmap_frame_t *frame, const dephy_motion_control_t *control);
 int dephy_bitmap_write_ppm(const dephy_bitmap_frame_t *frame, const char *path);
+int dephy_indexed_frame_init(dephy_indexed_frame_t *frame, uint16_t width, uint16_t height);
+void dephy_indexed_frame_free(dephy_indexed_frame_t *frame);
+int dephy_bitmap_to_indexed_matrix(const dephy_bitmap_frame_t *src,
+                                   dephy_indexed_frame_t *dst,
+                                   const dephy_bitmap_rgb_t *palette,
+                                   size_t palette_count);
+int dephy_indexed_write_pgm(const dephy_indexed_frame_t *frame, const char *path);
 dephy_motion_control_t dephy_motion_control_for_frame(const dephy_animation_config_t *config,
                                                       uint16_t frame_index);
 dephy_animation_config_t dephy_animation_default_config(void);
@@ -54,4 +67,3 @@ dephy_animation_config_t dephy_animation_default_config(void);
 #endif
 
 #endif
-

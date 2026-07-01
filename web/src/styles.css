@@ -6,6 +6,7 @@
   --text: #e6edf5;
   --muted: #91a0b4;
   --teal: #14b8a6;
+  --amber: #f59e0b;
 }
 
 * {
@@ -63,7 +64,7 @@ button {
 
 .hero h1 {
   margin: 0;
-  font-size: 34px;
+  font-size: 26px;
   line-height: 1;
   letter-spacing: 0;
 }
@@ -131,6 +132,53 @@ button {
   gap: 8px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
+}
+
+.timeline {
+  display: grid;
+  gap: 10px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.timeline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.timeline-head strong {
+  color: var(--amber);
+  font-variant-numeric: tabular-nums;
+}
+
+.ticks {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  height: 22px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #263241;
+  background: #0b1118;
+}
+
+.ticks span {
+  display: grid;
+  place-items: center;
+  border-right: 1px solid #263241;
+  color: #c8d5e4;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ticks span:last-child {
+  border-right: 0;
 }
 
 .mapping code {

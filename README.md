@@ -1,10 +1,19 @@
 # dephy_ml_high_speed_implement
 
-High-speed bitmap animation generator for controllable character motion.
+High-speed bitmap and 3D joint motion implementation for controllable character motion.
 
-The first target is command-line generation of bitmap frames. Later this repo
-can consume IO-device simulator values so digital/analog/relay inputs move a
-character's arms and legs, producing a running animation.
+The repo has two paths:
+
+- Generate bitmap or indexed matrix animation frames from the command line.
+- Replay slow IO samples into a named 3D joint timeline and predict smooth
+  motion frames between sparse IO updates.
+
+This is aimed at machines like a UC-4510-class Linux edge controller where IO
+polling or upstream protocol traffic may only arrive every 300ms. The simulator
+keeps those slow IO samples as trusted anchors, then predicts 16ms/33ms joint
+frames locally so the motion layer behaves closer to a high-speed control loop.
+The same pattern is intended for later mechanical-arm compensation: slow sensor
+or IO updates provide reality checks, while the local predictor fills the gap.
 
 ## Build And Test
 
@@ -33,6 +42,29 @@ The PPM format is intentionally simple and easy to inspect or convert:
 ffmpeg -framerate 12 -i build_out/run_frames/frame_%04d.ppm build_out/runner.gif
 ```
 
+For LED matrix or indexed targets:
+
+```sh
+build_out/dephy_bitmap_anim --out build_out/matrix_frames --frames 24 --width 64 --height 32 --format indexed
+```
+
+This writes `frame_0000.pgm` style indexed frames and stores the RGB palette in
+`manifest.txt`.
+
+For raw RGB frame streaming targets:
+
+```sh
+build_out/dephy_bitmap_anim --out build_out/raw_frames --frames 24 --width 64 --height 32 --format raw
+```
+
+Each `.raw` file is packed as `width * height * 3` bytes in RGB order.
+
+Benchmark high frame-count generation without writing frame files:
+
+```sh
+build_out/dephy_bitmap_anim --width 64 --height 32 --benchmark 1000
+```
+
 ## Motion Control Direction
 
 The public API exposes `dephy_motion_control_t`, which is the seam for later
@@ -58,8 +90,8 @@ Expected future mapping:
 
 ## 3D Control Sandbox
 
-The `web/` app is a Vite + React + Three.js sandbox for controlling a simple
-3D runner rig.
+The `web/` app is a Vite + React + Three.js sandbox for controlling a named
+19-joint runner rig.
 
 ```sh
 make -f Makefile.linux web-install
@@ -68,14 +100,43 @@ make -f Makefile.linux web
 
 Then open `http://127.0.0.1:8091/`.
 
-The 3D rig exposes the same future control ideas as the bitmap API: speed,
-gait phase, arm drive, and leg drive. Later, IO-device simulator events can map
-slot/channel/value changes into those controls.
+The 3D rig exposes the same control ideas as the C predictor: speed, gait
+phase, arm drive, leg drive, stride, and turn. The UI also shows 300ms IO
+anchors and the number of predicted frames generated between anchors.
 
 ## IO + ML Joint Prediction
 
-The longer-term target is a richer 3D joint rig that receives slow IO samples
-from `linux_io_device_simul` and predicts smooth intermediate joint frames.
+The C predictor receives slow IO samples from `linux_io_device_simul` style
+events and predicts smooth intermediate joint frames.
+
+Replay a sparse IO timeline:
+
+```sh
+build_out/dephy_joint_replay --render-ms 16 --io-ms 300 --samples 4 > build_out/joints.csv
+```
+
+Replay with slot/type/channel/value events:
+
+```sh
+build_out/dephy_joint_replay --samples 2 --event 1:di:1:1 --event 2:ai:1:80 --event 3:ai:2:65
+```
+
+Event mapping:
+
+- `di/do channel 1`: run gate.
+- `di/do channel 2`: turn left.
+- `di/do channel 3`: turn right.
+- `ai/ao channel 1`: speed target.
+- `ai/ao channel 2`: stride amplitude.
+- `ai/ao channel 3`: arm drive.
+- `ai/ao channel 4`: leg drive.
+- `relay channel 1`: motion lock.
+
+The current predictor has a deterministic gait baseline, linear interpolation
+between 300ms anchors, confidence scoring, and a small residual learner API.
+The residual learner observes target joint-frame error and applies an EMA
+correction, giving the repo a tested fallback path before a larger ML model is
+introduced.
 
 Design notes:
 
