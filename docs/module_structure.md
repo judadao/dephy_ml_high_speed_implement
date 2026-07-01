@@ -10,6 +10,7 @@
   and speed.
 - Linux CLI that generates PPM bitmap animation frames and a manifest.
 - Extension point for later IO-device simulator controls.
+- Design contract for slow IO sampling and high-rate joint prediction.
 
 ## Integration Direction
 
@@ -20,3 +21,5 @@ The future IO bridge should translate IO simulator events into
 - AI/AO channels can drive speed, gait phase, stride length, or limb amplitude.
 - A product demo can connect generated frames to a matrix display or web view.
 
+See `docs/io_ml_joint_prediction.md` for the planned 300ms IO sampling,
+multi-joint prediction, learning, and robotic compensation path.

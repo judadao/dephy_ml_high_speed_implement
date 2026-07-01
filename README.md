@@ -72,3 +72,15 @@ The 3D rig exposes the same future control ideas as the bitmap API: speed,
 gait phase, arm drive, and leg drive. Later, IO-device simulator events can map
 slot/channel/value changes into those controls.
 
+## IO + ML Joint Prediction
+
+The longer-term target is a richer 3D joint rig that receives slow IO samples
+from `linux_io_device_simul` and predicts smooth intermediate joint frames.
+
+Design notes:
+
+- [IO-driven joint prediction plan](docs/io_ml_joint_prediction.md)
+
+The intended path is to treat 300ms IO samples as sparse anchors, generate
+16ms/33ms predicted frames between them, and validate motion with deterministic
+scenario tests before using the same idea for robotic-arm compensation.
