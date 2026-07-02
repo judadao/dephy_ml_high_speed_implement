@@ -304,6 +304,44 @@ function applyHandFrame(parts, frame) {
   parts.bones.forEach(({ from, to, mesh }) => setBoneBetween(mesh, joints[from], joints[to]));
 }
 
+function HandFallback({ frame }) {
+  const joints = buildHandJoints(frame);
+  const pairs = [
+    ["wrist", "palm"],
+    ["wrist_left", "wrist"],
+    ["wrist", "wrist_right"],
+    ["palm_base_left", "palm"],
+    ["palm", "palm_base_right"],
+    ["palm_left", "palm"],
+    ["palm", "palm_right"],
+    ["palm_left", "palm_top"],
+    ["palm_top", "palm_right"],
+  ];
+  FINGERS.forEach((finger) => {
+    const anchor = finger.name === "thumb" ? "palm_left" : "palm_top";
+    pairs.push([anchor, `${finger.name}_metacarpal`]);
+    pairs.push([`${finger.name}_metacarpal`, `${finger.name}_mcp`]);
+    pairs.push([`${finger.name}_mcp`, `${finger.name}_pip`]);
+    pairs.push([`${finger.name}_pip`, `${finger.name}_dip`]);
+    pairs.push([`${finger.name}_dip`, `${finger.name}_tip`]);
+  });
+  const point = (joint) => `${180 + joint.x * 280},${260 - joint.y * 280 - joint.z * 100}`;
+
+  return (
+    <div className="fallback-hand">
+      <svg viewBox="0 0 360 360" role="img" aria-label="hand fallback">
+        {pairs.map(([from, to]) => (
+          <line key={`${from}-${to}`} x1={point(joints[from]).split(",")[0]} y1={point(joints[from]).split(",")[1]} x2={point(joints[to]).split(",")[0]} y2={point(joints[to]).split(",")[1]} />
+        ))}
+        {Object.entries(joints).map(([name, joint]) => {
+          const [cx, cy] = point(joint).split(",");
+          return <circle key={name} cx={cx} cy={cy} r={name.endsWith("_tip") ? 5 : 4} />;
+        })}
+      </svg>
+    </div>
+  );
+}
+
 function App() {
   const mountRef = useRef(null);
   const [keyframeCsv, setKeyframeCsv] = useState("");
@@ -549,7 +587,7 @@ function App() {
       renderer.dispose();
       mount.removeChild(renderer.domElement);
     };
-  }, [frame !== null]);
+  }, [frame !== null, keyframes.length > 0]);
 
   function resetDemo() {
     if (keyframes.length === 0) {
@@ -625,8 +663,9 @@ function App() {
       </section>
 
       <section className="stage-row">
-        <div className="stage" ref={mountRef} />
-        {renderError ? <div className="render-error">{renderError}</div> : null}
+        <div className="stage" ref={mountRef}>
+          {renderError ? <HandFallback frame={frame} /> : null}
+        </div>
         <aside className="control-panel">
           <div className="status-strip">
             <div>

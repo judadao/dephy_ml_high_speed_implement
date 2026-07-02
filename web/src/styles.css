@@ -101,6 +101,31 @@ button {
   background: #0b1118;
 }
 
+.fallback-hand {
+  min-height: calc(100vh - 82px);
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 50% 40%, #132033 0, #0b0f14 62%);
+}
+
+.fallback-hand svg {
+  width: min(72vw, 720px);
+  max-height: calc(100vh - 120px);
+}
+
+.fallback-hand line {
+  stroke: #d8e2ef;
+  stroke-width: 4;
+  stroke-linecap: round;
+  opacity: 0.82;
+}
+
+.fallback-hand circle {
+  fill: #14b8a6;
+  stroke: #e6edf5;
+  stroke-width: 1.5;
+}
+
 .control-panel {
   min-width: 0;
   display: grid;
