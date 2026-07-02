@@ -75,7 +75,7 @@ test "$(($(wc -l < "$outdir/full_random_prediction.csv") - 1))" -eq 4005
 
 python3 scripts/generate_random_hand_keyframes.py \
     --out "$outdir/grasp_can_keyframes.csv" \
-    --count 12 \
+    --count 40 \
     --sample-ms 300 \
     --seed 303 \
     --noise-scale 1.25 \
@@ -90,5 +90,5 @@ python3 scripts/dephy_hand_sequence_predict.py \
     --frames 1000
 
 grep -q '"success": true' "$outdir/grasp_can_result.json"
-test "$(($(wc -l < "$outdir/grasp_can_prediction.csv") - 1))" -eq 11012
-grep -q '"intermediate_prediction_frames": 11000' "$outdir/grasp_can_result.json"
+test "$(($(wc -l < "$outdir/grasp_can_prediction.csv") - 1))" -eq 39040
+grep -q '"intermediate_prediction_frames": 39000' "$outdir/grasp_can_result.json"

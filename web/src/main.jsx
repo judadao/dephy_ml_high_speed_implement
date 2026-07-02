@@ -11,6 +11,7 @@ const SEQUENCE_URL = "/demo/hand_sequence/prediction.csv";
 const RESULT_URL = "/demo/hand_sequence/result.json";
 const RENDER_MS = 16;
 const ANCHOR_MS = 300;
+const SCENE_Y_OFFSET = 0.62;
 const DEFAULT_POLICY = {
   format: "dephy_hand_policy_v1",
   kp_pos: 8.5,
@@ -252,12 +253,14 @@ function buildHandJoints(frame) {
     const side = finger.spread;
     const baseAngle = finger.angle;
     finger.length.forEach((length, index) => {
-      const bend = curl * (0.22 + index * 0.23);
+      const bend = curl * (0.36 + index * 0.36);
       const dir = baseAngle + side * (1 - curl * 0.5);
-      const reach = 1 - curl * (0.12 + index * 0.08);
+      const reach = 1 - curl * (0.18 + index * 0.12);
+      const inward = curl * curl * 0.018 * (index + 1) * (finger.name === "thumb" ? 1.4 : -Math.sign(finger.spread || 0.02));
       x += Math.sin(dir) * length * reach;
-      y += Math.cos(dir) * length * (1 - curl * (0.16 + index * 0.075));
-      z += Math.sin(bend) * (0.055 + index * 0.038);
+      x += inward;
+      y += Math.cos(dir) * length * (1 - curl * (0.26 + index * 0.11));
+      z += Math.sin(bend) * (0.065 + index * 0.052);
       joints[`${finger.name}_${FINGER_JOINTS[index]}`] = { x, y, z };
     });
   });
@@ -365,13 +368,14 @@ function createHandRig(scene) {
   });
 
   rig.rotation.x = -0.35;
+  rig.scale.setScalar(0.64);
   scene.add(rig);
   return { rig, jointMeshes, bones };
 }
 
 function createCanTarget(scene) {
   const group = new THREE.Group();
-  group.position.set(0.15, 0.26, 0.03);
+  group.position.set(0.15, 0.26 + SCENE_Y_OFFSET, 0.03);
 
   const body = new THREE.Mesh(
     new THREE.CylinderGeometry(0.105, 0.105, 0.58, 48),
@@ -408,7 +412,7 @@ function createCanTarget(scene) {
 
 function applyHandFrame(parts, frame) {
   const joints = buildHandJoints(frame);
-  parts.rig.position.set(frame.x * 1.8, frame.y * 1.8, frame.z * 1.8);
+  parts.rig.position.set(frame.x * 1.8, frame.y * 1.8 + SCENE_Y_OFFSET, frame.z * 1.8);
   parts.rig.rotation.set(-0.35 + frame.pitch, frame.yaw, frame.roll);
   Object.entries(joints).forEach(([name, pose]) => {
     parts.jointMeshes[name].position.set(pose.x, pose.y, pose.z);
@@ -691,13 +695,13 @@ function App() {
     }
 
     scene.background = new THREE.Color(0x0b0f14);
-    camera.position.set(0, 0.25, 3.05);
-    camera.lookAt(0.02, 0.12, 0);
+    camera.position.set(0, 0.04, 5.2);
+    camera.lookAt(0.0, -0.42, 0);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     mount.appendChild(renderer.domElement);
     controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(0.02, 0.12, 0);
+    controls.target.set(0.0, -0.42, 0);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controls.minDistance = 1.0;
