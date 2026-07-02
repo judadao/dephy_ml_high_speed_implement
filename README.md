@@ -283,6 +283,23 @@ make -f Makefile.linux web
 
 Then open `http://127.0.0.1:8091/`.
 
+The web demo is a realtime viewer. It polls these served files once per second:
+
+```txt
+web/public/demo/hand_sequence/prediction.csv
+web/public/demo/hand_sequence/result.json
+```
+
+Run the writer loop in another terminal or tmux session:
+
+```sh
+make -f Makefile.linux web-sequence-demo-loop
+```
+
+The writer loop keeps regenerating the core prediction artifacts and atomically
+updates the served CSV/JSON. The browser reloads the updated CSV without doing
+prediction inside React.
+
 The demo is browser-side only: it loads CSV keyframe fixtures that mirror the
 device loop, then applies the same bounded prediction idea to update palm
 position, rotation, grip, error, confidence, and target keyframe data live.

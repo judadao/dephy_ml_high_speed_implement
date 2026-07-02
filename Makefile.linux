@@ -7,7 +7,7 @@ OUTDIR  ?= build_out
 LIB := $(OUTDIR)/libdephy_ml_high_speed_implement.a
 OBJS := $(OUTDIR)/src/bitmap_anim.o $(OUTDIR)/src/joint_predictor.o $(OUTDIR)/src/hand_predictor.o
 
-.PHONY: all structure-audit direct-test test hand-rl-check hand-sequence-check io-device-pipeline-check zephyr-metadata demo web-demo-data web-install web-build web web-render-check clean
+.PHONY: all structure-audit direct-test test hand-rl-check hand-sequence-check io-device-pipeline-check zephyr-metadata demo web-demo-data web-sequence-demo-loop web-install web-build web web-render-check clean
 
 all: $(LIB) $(OUTDIR)/dephy_bitmap_anim $(OUTDIR)/dephy_joint_replay $(OUTDIR)/dephy_hand_predict
 
@@ -67,6 +67,9 @@ hand-rl-check:
 hand-sequence-check:
 	OUTDIR=$(OUTDIR) sh scripts/test_hand_sequence_model.sh
 
+web-sequence-demo-loop:
+	sh scripts/run_hand_sequence_realtime_demo.sh
+
 io-device-pipeline-check: $(OUTDIR)/dephy_joint_replay
 	OUTDIR=$(OUTDIR) sh scripts/test_io_device_pipeline.sh
 
@@ -80,6 +83,9 @@ web-demo-data:
 	mkdir -p web/public/demo
 	cp examples/hand/hand_keyframes.csv web/public/demo/hand_keyframes.csv
 	cp examples/hand/hand_policy.json web/public/demo/hand_policy.json
+	mkdir -p web/public/demo/hand_sequence
+	if [ -f $(OUTDIR)/hand_sequence/prediction.csv ]; then cp $(OUTDIR)/hand_sequence/prediction.csv web/public/demo/hand_sequence/prediction.csv; fi
+	if [ -f $(OUTDIR)/hand_sequence/result.json ]; then cp $(OUTDIR)/hand_sequence/result.json web/public/demo/hand_sequence/result.json; fi
 
 web-build: web-demo-data
 	npm --prefix web run build

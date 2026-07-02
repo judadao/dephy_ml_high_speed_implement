@@ -7,6 +7,8 @@ import "./styles.css";
 
 const KEYFRAME_URL = "/demo/hand_keyframes.csv";
 const POLICY_URL = "/demo/hand_policy.json";
+const SEQUENCE_URL = "/demo/hand_sequence/prediction.csv";
+const RESULT_URL = "/demo/hand_sequence/result.json";
 const RENDER_MS = 16;
 const ANCHOR_MS = 300;
 const DEFAULT_POLICY = {
@@ -49,6 +51,31 @@ function parseCsv(text) {
       hold_ms: Number(item.hold_ms),
       tolerance: Number(item.tolerance),
       safety_hold: Number(item.safety_hold),
+    };
+  });
+}
+
+function parsePredictionCsv(text) {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return [];
+  }
+  const [headerLine, ...rows] = trimmed.split(/\r?\n/);
+  const headers = headerLine.split(",");
+  return rows.map((row, index) => {
+    const values = row.split(",");
+    const item = Object.fromEntries(headers.map((key, column) => [key, values[column]]));
+    return {
+      frame_t_ms: Number(item.frame_t_ms),
+      target_frame: item.target_frame || `frame_${index}`,
+      x: Number(item.palm_x),
+      y: Number(item.palm_y),
+      z: Number(item.palm_z),
+      yaw: Number(item.yaw),
+      pitch: Number(item.pitch),
+      roll: Number(item.roll),
+      grip: Number(item.grip),
+      csvLine: index + 2,
     };
   });
 }
@@ -282,9 +309,14 @@ function App() {
   const [keyframeCsv, setKeyframeCsv] = useState("");
   const [keyframes, setKeyframes] = useState([]);
   const [policy, setPolicy] = useState(DEFAULT_POLICY);
+  const [sequenceCsv, setSequenceCsv] = useState("");
+  const [sequenceFrames, setSequenceFrames] = useState([]);
+  const [sequenceResult, setSequenceResult] = useState(null);
+  const [sequenceStatus, setSequenceStatus] = useState("waiting");
   const [dataStatus, setDataStatus] = useState("loading");
   const frameRef = useRef(null);
   const [frame, setFrame] = useState(frameRef.current);
+  const sequenceIndexRef = useRef(0);
   const [running, setRunning] = useState(true);
   const [renderError, setRenderError] = useState("");
 
@@ -327,10 +359,109 @@ function App() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    const loadSequence = () => {
+      fetch(`${SEQUENCE_URL}?t=${Date.now()}`, { cache: "no-store" })
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(SEQUENCE_URL);
+          }
+          return response.text();
+        })
+        .then((csv) => {
+          if (cancelled || csv === sequenceCsv) {
+            return;
+          }
+          const frames = parsePredictionCsv(csv);
+          if (frames.length === 0) {
+            return;
+          }
+          setSequenceCsv(csv);
+          setSequenceFrames(frames);
+          sequenceIndexRef.current = 0;
+          const first = frames[0];
+          frameRef.current = {
+            frame_t_ms: first.frame_t_ms,
+            targetIndex: 0,
+            x: first.x,
+            y: first.y,
+            z: first.z,
+            yaw: first.yaw,
+            pitch: first.pitch,
+            roll: first.roll,
+            grip: first.grip,
+            vx: 0,
+            vy: 0,
+            vz: 0,
+            error: 0,
+            confidence: 1,
+            csvLine: first.csvLine,
+            anchorLoop: 1,
+            target_frame: first.target_frame,
+          };
+          setFrame(frameRef.current);
+          setSequenceStatus("loaded");
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setSequenceStatus("waiting");
+          }
+        });
+
+      fetch(`${RESULT_URL}?t=${Date.now()}`, { cache: "no-store" })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((result) => {
+          if (!cancelled && result) {
+            setSequenceResult(result);
+          }
+        })
+        .catch(() => {});
+    };
+    loadSequence();
+    const timer = window.setInterval(loadSequence, 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [sequenceCsv]);
+
+  useEffect(() => {
     if (!running || keyframes.length === 0 || !frameRef.current) {
       return undefined;
     }
     const timer = window.setInterval(() => {
+      if (sequenceFrames.length > 0) {
+        const currentIndex = sequenceIndexRef.current;
+        const nextIndex = currentIndex + 1 >= sequenceFrames.length ? 0 : currentIndex + 1;
+        const current = sequenceFrames[currentIndex];
+        const nextFrame = sequenceFrames[nextIndex];
+        const previous = frameRef.current;
+        const dt = Math.max((nextFrame.frame_t_ms - current.frame_t_ms) / 1000, RENDER_MS / 1000);
+        const next = {
+          frame_t_ms: nextFrame.frame_t_ms,
+          targetIndex: 0,
+          x: nextFrame.x,
+          y: nextFrame.y,
+          z: nextFrame.z,
+          yaw: nextFrame.yaw,
+          pitch: nextFrame.pitch,
+          roll: nextFrame.roll,
+          grip: nextFrame.grip,
+          vx: previous ? (nextFrame.x - previous.x) / dt : 0,
+          vy: previous ? (nextFrame.y - previous.y) / dt : 0,
+          vz: previous ? (nextFrame.z - previous.z) / dt : 0,
+          error: sequenceResult?.final_error ?? 0,
+          confidence: sequenceResult?.success ? 1 : 0.85,
+          csvLine: nextFrame.csvLine,
+          anchorLoop: Math.floor(nextIndex / Math.max(sequenceFrames.length - 1, 1)) + 1,
+          target_frame: nextFrame.target_frame,
+        };
+        sequenceIndexRef.current = nextIndex;
+        frameRef.current = next;
+        setFrame(next);
+        return;
+      }
+
       const current = frameRef.current;
       const anchorStep = Math.floor(current.frame_t_ms / ANCHOR_MS);
       const targetIndex = (anchorStep % (keyframes.length - 1)) + 1;
@@ -348,7 +479,7 @@ function App() {
       setFrame(next);
     }, RENDER_MS);
     return () => window.clearInterval(timer);
-  }, [keyframes, policy, running]);
+  }, [keyframes, policy, running, sequenceFrames, sequenceResult]);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -425,6 +556,7 @@ function App() {
       return;
     }
     frameRef.current = initialState(keyframes[0]);
+    sequenceIndexRef.current = 0;
     setFrame(frameRef.current);
   }
 
@@ -442,9 +574,12 @@ function App() {
     );
   }
 
-  const target = keyframes[frame.targetIndex] || keyframes[0];
+  const sequenceMode = sequenceFrames.length > 0;
+  const target = sequenceMode
+    ? { frame_id: frame.target_frame || "sequence", grip: frame.grip, tolerance: 0.001 }
+    : keyframes[frame.targetIndex] || keyframes[0];
   const predictedGap = Math.floor(ANCHOR_MS / RENDER_MS);
-  const csvRows = keyframeCsv.trim().split(/\r?\n/);
+  const csvRows = (sequenceMode ? sequenceCsv : keyframeCsv).trim().split(/\r?\n/);
   const liveRows = [
     ["frame_t_ms", frame.frame_t_ms],
     ["target", target.frame_id],
@@ -462,12 +597,12 @@ function App() {
     ["confidence", frame.confidence.toFixed(3)],
   ];
   const policyRows = [
-    ["policy", policy.format],
-    ["kp_pos", Number(policy.kp_pos).toFixed(2)],
-    ["kd_pos", Number(policy.kd_pos).toFixed(2)],
-    ["kp_rot", Number(policy.kp_rot).toFixed(2)],
-    ["kp_grip", Number(policy.kp_grip).toFixed(2)],
-    ["speed", Number(policy.speed_scale).toFixed(2)],
+    ["source", sequenceMode ? "sequence csv" : "browser fallback"],
+    ["frames", sequenceMode ? sequenceFrames.length : keyframes.length],
+    ["status", sequenceStatus],
+    ["success", sequenceResult ? String(sequenceResult.success) : "-"],
+    ["error", sequenceResult ? Number(sequenceResult.final_error).toFixed(5) : "-"],
+    ["jump", sequenceResult ? Number(sequenceResult.max_position_jump).toFixed(4) : "-"],
   ];
 
   return (
@@ -500,32 +635,40 @@ function App() {
             </div>
             <div>
               <span>implement</span>
-              <strong>{RENDER_MS}ms</strong>
+              <strong>{sequenceMode ? "CSV" : `${RENDER_MS}ms`}</strong>
             </div>
             <div>
               <span>fill</span>
-              <strong>{predictedGap}/gap</strong>
+              <strong>{sequenceMode ? `${sequenceFrames.length}f` : `${predictedGap}/gap`}</strong>
             </div>
           </div>
 
           <div className="source-strip">
-            <span>{KEYFRAME_URL}</span>
-            <span>{POLICY_URL}</span>
+            <span>{sequenceMode ? SEQUENCE_URL : KEYFRAME_URL}</span>
+            <span>{sequenceMode ? RESULT_URL : POLICY_URL}</span>
           </div>
 
           <div className="timeline">
             <div className="timeline-head">
-              <span>keyframe script</span>
-              <strong>loop {frame.anchorLoop}</strong>
+              <span>{sequenceMode ? "realtime prediction csv" : "keyframe script"}</span>
+              <strong>{sequenceMode ? `line ${frame.csvLine}` : `loop ${frame.anchorLoop}`}</strong>
             </div>
             <div className="keyframe-list">
-              {keyframes.map((item, index) => (
-                <div className={index === frame.targetIndex ? "keyframe active" : "keyframe"} key={item.frame_id}>
-                  <span>{item.t_ms}</span>
-                  <strong>{item.frame_id}</strong>
-                  <em>{item.grip.toFixed(2)}</em>
-                </div>
-              ))}
+              {sequenceMode
+                ? sequenceFrames.slice(Math.max(0, sequenceIndexRef.current - 2), sequenceIndexRef.current + 3).map((item) => (
+                    <div className={item.csvLine === frame.csvLine ? "keyframe active" : "keyframe"} key={`${item.csvLine}-${item.frame_t_ms}`}>
+                      <span>{item.frame_t_ms}</span>
+                      <strong>{item.target_frame}</strong>
+                      <em>{item.grip.toFixed(2)}</em>
+                    </div>
+                  ))
+                : keyframes.map((item, index) => (
+                    <div className={index === frame.targetIndex ? "keyframe active" : "keyframe"} key={item.frame_id}>
+                      <span>{item.t_ms}</span>
+                      <strong>{item.frame_id}</strong>
+                      <em>{item.grip.toFixed(2)}</em>
+                    </div>
+                  ))}
             </div>
           </div>
 
@@ -549,7 +692,7 @@ function App() {
 
           <div className="csv-panel">
             <div className="timeline-head">
-              <span>csv anchor stream</span>
+              <span>{sequenceMode ? "prediction csv" : "csv anchor stream"}</span>
               <strong>line {frame.csvLine}</strong>
             </div>
             <pre>{csvRows.slice(0, 1).concat(csvRows.slice(Math.max(1, frame.csvLine - 1), frame.csvLine + 2)).join("\n")}</pre>
