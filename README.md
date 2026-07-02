@@ -223,6 +223,52 @@ Real IO will not be perfectly stable. The predictor treats keyframes as anchors,
 uses the current observed palm state as feedback, and dynamically adjusts
 position, rotation, grip, and velocity until the target keyframe is reached.
 
+## Sequence Model Prediction
+
+For the smoother path, use the sequence model pipeline. It treats each 300ms IO
+interval as one segment and generates the whole high-rate motion segment at
+once:
+
+```txt
+300ms IO keyframe A + keyframe B
+  -> sequence model
+  -> smooth 16ms frames for the whole segment
+  -> final segment frame matches keyframe B exactly
+```
+
+Generate positive/negative fine-tuning data:
+
+```sh
+python3 scripts/generate_hand_sequence_dataset.py \
+  --positive-out build_out/hand_sequence/positive.jsonl \
+  --negative-out build_out/hand_sequence/negative.jsonl
+```
+
+Train the sequence model with dependency-free reward search:
+
+```sh
+python3 scripts/train_hand_sequence_model.py \
+  --positive build_out/hand_sequence/positive.jsonl \
+  --negative build_out/hand_sequence/negative.jsonl \
+  --out build_out/hand_sequence/model.json
+```
+
+Generate high-rate frames:
+
+```sh
+python3 scripts/dephy_hand_sequence_predict.py \
+  --keyframes examples/hand/hand_keyframes.csv \
+  --model build_out/hand_sequence/model.json \
+  --out build_out/hand_sequence/prediction.csv \
+  --result build_out/hand_sequence/result.json \
+  --render-ms 16
+```
+
+This path is designed around a strict endpoint contract: every generated
+segment writes the final frame exactly at the requested keyframe. Smoothness is
+validated with per-frame jump limits relative to the segment distance, so large
+valid moves are allowed while snap-style negative samples are rejected.
+
 ## Web Hand Demo
 
 The Vite web demo visualizes the single-palm scope. The left side renders hand
