@@ -6,7 +6,7 @@ OUTDIR  ?= build_out
 FRAMES  ?= 1000
 WEB_SEED ?= 101
 NOISE_SCALE ?= 1.0
-KEYFRAME_COUNT ?= 40
+KEYFRAME_COUNT ?= 64
 KEYFRAME_MODE ?= grasp_can
 
 LIB := $(OUTDIR)/libdephy_ml_high_speed_implement.a

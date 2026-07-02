@@ -257,9 +257,11 @@ function buildHandJoints(frame) {
       const dir = baseAngle + side * (1 - curl * 0.5);
       const reach = 1 - curl * (0.18 + index * 0.12);
       const inward = curl * curl * 0.018 * (index + 1) * (finger.name === "thumb" ? 1.4 : -Math.sign(finger.spread || 0.02));
+      const palmward = finger.name === "thumb" ? 0 : curl * curl * 0.052 * (index + 1);
       x += Math.sin(dir) * length * reach;
       x += inward;
-      y += Math.cos(dir) * length * (1 - curl * (0.26 + index * 0.11));
+      y += Math.cos(dir) * length * (1 - curl * (0.42 + index * 0.19));
+      y -= palmward;
       z += Math.sin(bend) * (0.065 + index * 0.052);
       joints[`${finger.name}_${FINGER_JOINTS[index]}`] = { x, y, z };
     });
