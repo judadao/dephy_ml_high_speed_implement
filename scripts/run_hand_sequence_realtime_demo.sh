@@ -7,7 +7,8 @@ keyframes="${KEYFRAMES:-examples/hand/hand_keyframes.csv}"
 interval="${INTERVAL_SEC:-1}"
 frames="${FRAMES:-1000}"
 random_init="${RANDOM_INIT:-1}"
-keyframe_count="${KEYFRAME_COUNT:-5}"
+keyframe_count="${KEYFRAME_COUNT:-12}"
+keyframe_mode="${KEYFRAME_MODE:-gesture}"
 sample_ms="${SAMPLE_MS:-300}"
 noise_scale="${NOISE_SCALE:-1.0}"
 seed_base="${SEED:-$(date +%s)}"
@@ -29,7 +30,8 @@ while :; do
             --count "$keyframe_count" \
             --sample-ms "$sample_ms" \
             --seed "$((seed_base + loops))" \
-            --noise-scale "$noise_scale"
+            --noise-scale "$noise_scale" \
+            --mode "$keyframe_mode"
     fi
 
     python3 scripts/dephy_hand_sequence_predict.py \

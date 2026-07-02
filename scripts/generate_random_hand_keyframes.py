@@ -35,6 +35,28 @@ def noisy_pose(pose: list[float], rng: random.Random, noise_scale: float) -> lis
     return noisy
 
 
+def gesture_pose(index: int, count: int, rng: random.Random) -> list[float]:
+    denom = max(count - 1, 1)
+    phase = index / denom
+    x = -0.18 + 0.36 * phase
+    y = 0.09 * ((index % 4) / 3.0 - 0.5)
+    z = -0.035 + 0.07 * ((index % 3) / 2.0)
+    yaw = -0.32 + 0.64 * phase
+    pitch = 0.14 if index % 2 == 0 else -0.12
+    roll = -0.16 + 0.32 * ((index % 5) / 4.0)
+    grip_pattern = [0.05, 0.25, 0.62, 0.95, 0.72, 0.38, 0.12, 0.58, 0.9, 0.45, 0.18, 0.03]
+    grip = grip_pattern[index % len(grip_pattern)]
+    return [
+        x + rng.uniform(-0.035, 0.035),
+        y + rng.uniform(-0.025, 0.025),
+        z + rng.uniform(-0.015, 0.015),
+        yaw + rng.uniform(-0.05, 0.05),
+        pitch + rng.uniform(-0.035, 0.035),
+        roll + rng.uniform(-0.035, 0.035),
+        clamp(grip + rng.uniform(-0.04, 0.04), 0.0, 1.0),
+    ]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", required=True)
@@ -43,6 +65,7 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--template", help="optional clean keyframe CSV to perturb with IO noise")
     parser.add_argument("--noise-scale", type=float, default=0.0, help="apply bounded IO-like error to every keyframe")
+    parser.add_argument("--mode", choices=["random", "gesture"], default="random")
     args = parser.parse_args()
 
     if args.count < 2:
@@ -61,7 +84,7 @@ def main() -> int:
                 frame_id = f"{row['frame_id']}_noisy"
                 t_ms = int(row["t_ms"])
             else:
-                pose = rand_pose(rng)
+                pose = gesture_pose(index, args.count, rng) if args.mode == "gesture" else rand_pose(rng)
                 frame_id = "random_init" if index == 0 else f"random_target_{index:04d}"
                 t_ms = index * args.sample_ms
             pose = noisy_pose(pose, rng, args.noise_scale)
