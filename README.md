@@ -2,7 +2,35 @@
 
 High-speed bitmap and 3D joint motion implementation for controllable character motion.
 
-The repo has two paths:
+## Current Scope
+
+The active implementation scope is now **single-palm coordinate prediction**.
+The goal is to let old or weak Linux hardware provide low-rate keyframes or IO
+anchors, then have this repo predict the missing high-rate frames between those
+anchors.
+
+Users provide keyframes such as palm position, rotation, grip, tolerance, and
+hold time. The predictor reads the current palm state, dynamically adjusts the
+movement direction, generates interpolation frames, and keeps correcting until
+the current keyframe is complete. This phase validates by coordinate data only;
+it does not require 3D rendering.
+
+The target pattern is:
+
+```txt
+low-rate keyframes / IO anchors
+  -> deterministic or RL hand policy
+  -> 16ms/33ms predicted palm frames
+  -> CSV/JSONL data for validation
+```
+
+This is meant to make weak hardware behave closer to a high-speed data source
+by filling the missing frames with bounded prediction, not by pretending the
+hardware itself is actually sampling faster.
+
+## Existing Paths
+
+The repo also has earlier exploratory paths:
 
 - Generate bitmap or indexed matrix animation frames from the command line.
 - Consume slow IO samples emitted by `linux_io_device_simul`, convert them into
