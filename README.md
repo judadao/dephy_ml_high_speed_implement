@@ -261,13 +261,19 @@ python3 scripts/dephy_hand_sequence_predict.py \
   --model build_out/hand_sequence/model.json \
   --out build_out/hand_sequence/prediction.csv \
   --result build_out/hand_sequence/result.json \
-  --render-ms 16
+  --render-ms 16 \
+  --frames 1000
 ```
 
 This path is designed around a strict endpoint contract: every generated
 segment writes the final frame exactly at the requested keyframe. Smoothness is
 validated with per-frame jump limits relative to the segment distance, so large
 valid moves are allowed while snap-style negative samples are rejected.
+
+`--frames 1000` asks the sequence predictor to distribute exactly 1000
+prediction rows across the full keyframe path. The keyframe rows remain exact
+anchors, while the extra rows become dense predicted frames between them. Omit
+`--frames` to fall back to the lower-rate `--render-ms` spacing.
 
 ## Web Hand Demo
 
@@ -299,6 +305,13 @@ make -f Makefile.linux web-sequence-demo-loop
 The writer loop keeps regenerating the core prediction artifacts and atomically
 updates the served CSV/JSON. The browser reloads the updated CSV without doing
 prediction inside React.
+
+By default the writer loop uses `FRAMES=1000`, so the web demo shows a dense
+1000-frame prediction stream. Override it when needed:
+
+```sh
+FRAMES=300 make -f Makefile.linux web-sequence-demo-loop
+```
 
 The demo is browser-side only: it loads CSV keyframe fixtures that mirror the
 device loop, then applies the same bounded prediction idea to update palm

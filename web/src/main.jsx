@@ -158,6 +158,24 @@ function buildSequenceTimeline(frames, keyframes) {
   return blocks;
 }
 
+function nextSequenceIndexByTime(frames, currentIndex, stepMs) {
+  if (frames.length <= 1) {
+    return 0;
+  }
+  const currentTime = frames[currentIndex]?.frame_t_ms ?? frames[0].frame_t_ms;
+  const endTime = frames[frames.length - 1].frame_t_ms;
+  const targetTime = currentTime + stepMs;
+  if (targetTime > endTime) {
+    return 0;
+  }
+  for (let index = currentIndex + 1; index < frames.length; index += 1) {
+    if (frames[index].frame_t_ms >= targetTime) {
+      return index;
+    }
+  }
+  return frames.length - 1;
+}
+
 function errorToTarget(state, target) {
   const pos = Math.hypot(target.x - state.x, target.y - state.y, target.z - state.z);
   const rot = Math.hypot(target.yaw - state.yaw, target.pitch - state.pitch, target.roll - state.roll) * 0.2;
@@ -528,11 +546,11 @@ function App() {
     const timer = window.setInterval(() => {
       if (sequenceFrames.length > 0) {
         const currentIndex = sequenceIndexRef.current;
-        const nextIndex = currentIndex + 1 >= sequenceFrames.length ? 0 : currentIndex + 1;
+        const nextIndex = nextSequenceIndexByTime(sequenceFrames, currentIndex, RENDER_MS);
         const current = sequenceFrames[currentIndex];
         const nextFrame = sequenceFrames[nextIndex];
         const previous = frameRef.current;
-        const dt = Math.max((nextFrame.frame_t_ms - current.frame_t_ms) / 1000, RENDER_MS / 1000);
+        const dt = nextIndex === 0 ? RENDER_MS / 1000 : Math.max((nextFrame.frame_t_ms - current.frame_t_ms) / 1000, RENDER_MS / 1000);
         const next = {
           frame_t_ms: nextFrame.frame_t_ms,
           targetIndex: 0,
@@ -679,7 +697,7 @@ function App() {
   const predictedGap = Math.floor(ANCHOR_MS / RENDER_MS);
   const csvRows = (sequenceMode ? sequenceCsv : keyframeCsv).trim().split(/\r?\n/);
   const liveRows = [
-    ["frame_t_ms", frame.frame_t_ms],
+    ["frame_t_ms", Number(frame.frame_t_ms).toFixed(3).replace(/\.000$/, "")],
     ["target", target.frame_id],
     ["palm_x", frame.x.toFixed(4)],
     ["palm_y", frame.y.toFixed(4)],

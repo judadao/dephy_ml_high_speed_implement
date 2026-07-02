@@ -3,6 +3,7 @@ AR      ?= ar
 CFLAGS  ?= -Wall -Wextra -std=c11 -g
 LDFLAGS ?= -lm
 OUTDIR  ?= build_out
+FRAMES  ?= 1000
 
 LIB := $(OUTDIR)/libdephy_ml_high_speed_implement.a
 OBJS := $(OUTDIR)/src/bitmap_anim.o $(OUTDIR)/src/joint_predictor.o $(OUTDIR)/src/hand_predictor.o
@@ -68,7 +69,7 @@ hand-sequence-check:
 	OUTDIR=$(OUTDIR) sh scripts/test_hand_sequence_model.sh
 
 web-sequence-demo-loop:
-	sh scripts/run_hand_sequence_realtime_demo.sh
+	FRAMES=$(FRAMES) sh scripts/run_hand_sequence_realtime_demo.sh
 
 io-device-pipeline-check: $(OUTDIR)/dephy_joint_replay
 	OUTDIR=$(OUTDIR) sh scripts/test_io_device_pipeline.sh

@@ -5,6 +5,7 @@ outdir="web/public/demo/hand_sequence"
 model="${MODEL:-build_out/hand_sequence/model.json}"
 keyframes="${KEYFRAMES:-examples/hand/hand_keyframes.csv}"
 interval="${INTERVAL_SEC:-1}"
+frames="${FRAMES:-1000}"
 
 mkdir -p "$outdir"
 
@@ -18,7 +19,8 @@ while :; do
         --model "$model" \
         --out "$outdir/prediction.csv.tmp" \
         --result "$outdir/result.json.tmp" \
-        --render-ms 16
+        --render-ms 16 \
+        --frames "$frames"
     mv "$outdir/prediction.csv.tmp" "$outdir/prediction.csv"
     mv "$outdir/result.json.tmp" "$outdir/result.json"
     sleep "$interval"

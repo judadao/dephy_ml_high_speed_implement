@@ -25,8 +25,11 @@ python3 scripts/dephy_hand_sequence_predict.py \
     --model "$outdir/model.json" \
     --out "$outdir/prediction.csv" \
     --result "$outdir/result.json" \
-    --render-ms 16
+    --render-ms 16 \
+    --frames 1000
 
 grep -q '^frame_t_ms,target_frame,palm_x' "$outdir/prediction.csv"
 grep -q '"format": "dephy_hand_sequence_result_v1"' "$outdir/result.json"
 grep -q '"success": true' "$outdir/result.json"
+test "$(($(wc -l < "$outdir/prediction.csv") - 1))" -eq 1000
+grep -q '"prediction_frames": 1000' "$outdir/result.json"
