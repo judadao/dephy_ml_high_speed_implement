@@ -94,6 +94,56 @@ The current policy artifact is a small gain-based controller trained in the
 offline environment. Unsafe or missing policies fall back to the deterministic
 bounded predictor.
 
+## Recorded Keyframe Workflow
+
+The expected production-like path is:
+
+```txt
+user IO / device simulator
+  -> record low-rate keyframe anchors
+  -> train or load a hand policy
+  -> predict high-rate frames from noisy observed IO
+  -> keep correcting until each keyframe is reached
+```
+
+The simulator repo can record its hand keyframe stream into the CSV format used
+here:
+
+```sh
+../linux_io_device_simul/build_out/linux_io_device_simul \
+  --hand-stream \
+  --loop 1 \
+  --sample-ms 300 \
+  ../linux_io_device_simul/scripts/hand_keyframe_demo.script \
+  > build_out/hand_device_stream.out
+
+../linux_io_device_simul/build_out/linux_io_device_simul \
+  --record-hand-keyframes \
+  build_out/hand_device_stream.out \
+  > build_out/recorded_hand_keyframes.csv
+```
+
+Use the recorded keyframes directly:
+
+```sh
+build_out/dephy_hand_predict \
+  --keyframes build_out/recorded_hand_keyframes.csv \
+  --policy examples/hand/hand_policy.json \
+  --render-ms 16 > build_out/recorded_hand_frames.csv
+```
+
+Or train a new policy from recorded/scenario keyframes:
+
+```sh
+python3 scripts/train_hand_policy.py \
+  --scenario build_out/recorded_hand_keyframes.csv \
+  --out build_out/recorded_hand_policy.json
+```
+
+Real IO will not be perfectly stable. The predictor treats keyframes as anchors,
+uses the current observed palm state as feedback, and dynamically adjusts
+position, rotation, grip, and velocity until the target keyframe is reached.
+
 ## Web Hand Demo
 
 The Vite web demo visualizes the single-palm scope. The left side renders hand
