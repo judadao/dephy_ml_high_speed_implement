@@ -92,6 +92,7 @@ web-demo-data:
 	python3 scripts/generate_random_hand_keyframes.py --out web/public/demo/hand_keyframes.csv --count $(KEYFRAME_COUNT) --sample-ms 300 --seed $(WEB_SEED) --noise-scale $(NOISE_SCALE) --mode $(KEYFRAME_MODE)
 	node scripts/validate_hand_keyframe_clearance.mjs --keyframes web/public/demo/hand_keyframes.csv --min-clearance 0
 	python3 scripts/dephy_hand_sequence_predict.py --keyframes web/public/demo/hand_keyframes.csv --model $(OUTDIR)/hand_sequence/model.json --out web/public/demo/hand_sequence/prediction.csv --result web/public/demo/hand_sequence/result.json --render-ms 16 --frames $(FRAMES)
+	node scripts/validate_hand_keyframe_clearance.mjs --prediction web/public/demo/hand_sequence/prediction.csv --min-clearance 0
 
 web-build: web-demo-data
 	npm --prefix web run build

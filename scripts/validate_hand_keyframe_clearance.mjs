@@ -3,7 +3,7 @@ import fs from "node:fs";
 import { canClearanceMetrics } from "../web/src/handRig.js";
 
 function usage() {
-  console.error("usage: validate_hand_keyframe_clearance.mjs --keyframes <csv> [--min-clearance <meters>]");
+  console.error("usage: validate_hand_keyframe_clearance.mjs (--keyframes <csv> | --prediction <csv>) [--min-clearance <meters>]");
 }
 
 function parseArgs(argv) {
@@ -13,6 +13,9 @@ function parseArgs(argv) {
     if (arg === "--keyframes") {
       args.keyframes = argv[index + 1];
       index += 1;
+    } else if (arg === "--prediction") {
+      args.prediction = argv[index + 1];
+      index += 1;
     } else if (arg === "--min-clearance") {
       args.minClearance = Number(argv[index + 1]);
       index += 1;
@@ -21,36 +24,45 @@ function parseArgs(argv) {
       process.exit(2);
     }
   }
-  if (!args.keyframes) {
+  if (!args.keyframes && !args.prediction) {
+    usage();
+    process.exit(2);
+  }
+  if (args.keyframes && args.prediction) {
     usage();
     process.exit(2);
   }
   return args;
 }
 
-function parseCsv(text) {
+function parseCsv(text, mode) {
   const [headerLine, ...rows] = text.trim().split(/\r?\n/);
   const headers = headerLine.split(",");
   return rows.filter(Boolean).map((row) => {
     const values = row.split(",");
     const item = Object.fromEntries(headers.map((key, index) => [key, values[index]]));
-    return {
-      frame_id: item.frame_id,
-      t_ms: Number(item.t_ms),
-      x: Number(item.x),
-      y: Number(item.y),
-      z: Number(item.z),
-      yaw: Number(item.yaw),
-      pitch: Number(item.pitch),
-      roll: Number(item.roll),
-      grip: Number(item.grip),
-      keyframeLock: true,
-    };
+    if (mode === "prediction") {
+      return {
+        frame_id: item.target_frame,
+        t_ms: Number(item.frame_t_ms),
+        x: Number(item.palm_x),
+        y: Number(item.palm_y),
+        z: Number(item.palm_z),
+        yaw: Number(item.yaw),
+        pitch: Number(item.pitch),
+        roll: Number(item.roll),
+        grip: Number(item.grip),
+        keyframeLock: false,
+      };
+    }
+    return { frame_id: item.frame_id, t_ms: Number(item.t_ms), x: Number(item.x), y: Number(item.y), z: Number(item.z), yaw: Number(item.yaw), pitch: Number(item.pitch), roll: Number(item.roll), grip: Number(item.grip), keyframeLock: true };
   });
 }
 
 const args = parseArgs(process.argv);
-const frames = parseCsv(fs.readFileSync(args.keyframes, "utf8"));
+const mode = args.prediction ? "prediction" : "keyframe";
+const input = args.prediction ?? args.keyframes;
+const frames = parseCsv(fs.readFileSync(input, "utf8"), mode);
 let worst = { minClearance: Number.POSITIVE_INFINITY, frame: null, worstJoint: "" };
 const failures = [];
 
@@ -65,7 +77,7 @@ frames.forEach((frame) => {
 });
 
 if (failures.length > 0) {
-  console.error(`hand keyframe clearance failed: ${failures.length} penetrating keyframes`);
+  console.error(`hand ${mode} clearance failed: ${failures.length} penetrating frames`);
   failures.slice(0, 10).forEach(({ frame, minClearance, worstJoint }) => {
     console.error(`${frame.frame_id}@${frame.t_ms}ms ${worstJoint} clearance=${minClearance.toFixed(6)}`);
   });
@@ -73,5 +85,5 @@ if (failures.length > 0) {
 }
 
 console.log(
-  `hand keyframe clearance ok: ${frames.length} keyframes, min=${worst.minClearance.toFixed(6)} at ${worst.frame?.frame_id ?? "n/a"} ${worst.worstJoint}`
+  `hand ${mode} clearance ok: ${frames.length} frames, min=${worst.minClearance.toFixed(6)} at ${worst.frame?.frame_id ?? "n/a"} ${worst.worstJoint}`
 );

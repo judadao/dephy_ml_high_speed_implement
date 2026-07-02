@@ -6,6 +6,7 @@ export const CAN_WORLD_CENTER = new THREE.Vector3(0.15, 0.26 + SCENE_Y_OFFSET, 0
 export const CAN_RADIUS = 0.105;
 export const CAN_HALF_HEIGHT = 0.29;
 export const FINGER_JOINTS = ["metacarpal", "mcp", "pip", "dip", "tip"];
+const PALM_COLLISION_JOINTS = ["palm", "palm_top", "palm_left", "palm_right", "palm_base_left", "palm_base_right"];
 export const FINGERS = [
   { name: "thumb", base: [-0.31, -0.07, 0.045], spread: -0.42, length: [0.07, 0.13, 0.12, 0.095, 0.055], angle: -0.72, curlBias: 1.2 },
   { name: "index", base: [-0.15, 0.18, 0.025], spread: -0.14, length: [0.08, 0.17, 0.15, 0.115, 0.06], angle: 0.12, curlBias: 1.0 },
@@ -24,31 +25,31 @@ const CAN_GRASP_JOINT_TARGETS = {
   ],
   index: [
     [-0.145, 0.255, 0.065],
-    [-0.125, 0.315, 0.125],
-    [-0.095, 0.275, 0.19],
-    [-0.07, 0.215, 0.215],
-    [-0.052, 0.165, 0.195],
+    [-0.13, 0.335, 0.13],
+    [-0.105, 0.245, 0.225],
+    [-0.078, 0.135, 0.255],
+    [-0.055, 0.055, 0.215],
   ],
   middle: [
     [0.0, 0.275, 0.065],
-    [0.0, 0.335, 0.13],
-    [0.0, 0.29, 0.2],
-    [0.0, 0.225, 0.225],
-    [0.0, 0.17, 0.205],
+    [0.0, 0.355, 0.135],
+    [0.0, 0.255, 0.235],
+    [0.0, 0.14, 0.265],
+    [0.0, 0.055, 0.225],
   ],
   ring: [
     [0.135, 0.255, 0.065],
-    [0.115, 0.315, 0.125],
-    [0.088, 0.275, 0.19],
-    [0.064, 0.215, 0.215],
-    [0.046, 0.165, 0.195],
+    [0.118, 0.335, 0.13],
+    [0.092, 0.245, 0.225],
+    [0.066, 0.135, 0.255],
+    [0.045, 0.055, 0.215],
   ],
   pinky: [
     [0.245, 0.205, 0.06],
-    [0.215, 0.26, 0.115],
-    [0.18, 0.235, 0.175],
-    [0.145, 0.185, 0.2],
-    [0.115, 0.145, 0.18],
+    [0.215, 0.275, 0.12],
+    [0.175, 0.205, 0.205],
+    [0.135, 0.115, 0.235],
+    [0.105, 0.045, 0.195],
   ],
 };
 
@@ -123,13 +124,20 @@ function keepFingerJointsOutsideCan(joints, frame) {
   const gripClose = smoothstep((frame.grip - 0.32) / 0.68);
   const can = canInHandSpace(frame);
   const approachGuard = 0.16 * smoothstep((0.74 - can.center.length()) / 0.3);
-  if (hardLock <= 0 && gripClose <= 0 && approachGuard <= 0) {
-    return;
-  }
 
-  FINGERS.forEach((finger) => {
-    FINGER_JOINTS.forEach((joint, index) => {
-      const name = `${finger.name}_${joint}`;
+  const collisionJoints = [
+    ...PALM_COLLISION_JOINTS.map((name) => ({ name, clearance: 0.09 / HAND_SCALE, fallback: new THREE.Vector3(-0.2, 0, 0.1).normalize() })),
+    ...FINGERS.flatMap((finger) =>
+      FINGER_JOINTS.map((joint, index) => ({
+        name: `${finger.name}_${joint}`,
+        clearance: (index >= 3 ? 0.06 : 0.045) / HAND_SCALE,
+        fallback: new THREE.Vector3(finger.base[0] || 0.01, 0, 0.12).normalize(),
+      }))
+    ),
+  ];
+
+  for (let pass = 0; pass < 3; pass += 1) {
+    collisionJoints.forEach(({ name, clearance, fallback }) => {
       const pose = joints[name];
       const point = new THREE.Vector3(pose.x, pose.y, pose.z);
       const offset = point.clone().sub(can.center);
@@ -140,27 +148,39 @@ function keepFingerJointsOutsideCan(joints, frame) {
       const axial = can.axis.clone().multiplyScalar(axialDistance);
       const radial = offset.sub(axial);
       const radialDistance = radial.length();
-      const jointClearance = (index >= 3 ? 0.06 : 0.045) / HAND_SCALE;
-      const minimumDistance = can.radius + jointClearance;
+      const minimumDistance = can.radius + clearance;
       if (radialDistance >= minimumDistance) {
         return;
       }
       const penetration = smoothstep((minimumDistance - radialDistance) / minimumDistance);
-      const collisionStrength = Math.max(hardLock, gripClose, approachGuard * penetration);
-      const fallbackNormal = new THREE.Vector3(finger.base[0] || 0.01, 0, 0.12).normalize();
-      const normal = radialDistance > 0.001 ? radial.normalize() : fallbackNormal;
-      const corrected = can.center.clone().add(axial).add(normal.multiplyScalar(minimumDistance));
+      const collisionStrength = hardLock || penetration > 0 ? 1 : Math.max(gripClose, approachGuard * penetration);
+      const normal = radialDistance > 0.001 ? radial.normalize() : fallback;
+      const corrected = can.center.clone().add(axial).add(normal.multiplyScalar(minimumDistance + 0.002));
       pose.x = pose.x * (1 - collisionStrength) + corrected.x * collisionStrength;
       pose.y = pose.y * (1 - collisionStrength) + corrected.y * collisionStrength;
       pose.z = pose.z * (1 - collisionStrength) + corrected.z * collisionStrength;
     });
-  });
+  }
 }
 
 export function canClearanceMetrics(frame, joints = buildHandJoints(frame)) {
   const can = canInHandSpace(frame);
   let minClearance = Number.POSITIVE_INFINITY;
   let worstJoint = "";
+  PALM_COLLISION_JOINTS.forEach((name) => {
+    const pose = joints[name];
+    const offset = new THREE.Vector3(pose.x, pose.y, pose.z).sub(can.center);
+    const axialDistance = offset.dot(can.axis);
+    if (Math.abs(axialDistance) > can.halfHeight + 0.08) {
+      return;
+    }
+    const radialDistance = offset.sub(can.axis.clone().multiplyScalar(axialDistance)).length();
+    const clearance = radialDistance - (can.radius + 0.09 / HAND_SCALE);
+    if (clearance < minClearance) {
+      minClearance = clearance;
+      worstJoint = name;
+    }
+  });
   FINGERS.forEach((finger) => {
     FINGER_JOINTS.forEach((joint, index) => {
       const name = `${finger.name}_${joint}`;
