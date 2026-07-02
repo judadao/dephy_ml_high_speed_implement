@@ -85,6 +85,11 @@ button {
 
 .stage canvas {
   display: block;
+  cursor: grab;
+}
+
+.stage canvas:active {
+  cursor: grabbing;
 }
 
 .render-error {

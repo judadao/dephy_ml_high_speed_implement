@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Pause, Play, RotateCcw } from "lucide-react";
 import * as THREE from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import "./styles.css";
 
 const KEYFRAME_CSV = `frame_id,t_ms,x,y,z,yaw,pitch,roll,grip,hold_ms,tolerance,safety_hold
@@ -13,12 +14,13 @@ open_return,1200,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0,0.012,0`;
 
 const RENDER_MS = 16;
 const ANCHOR_MS = 300;
+const FINGER_JOINTS = ["metacarpal", "mcp", "pip", "dip", "tip"];
 const FINGERS = [
-  { name: "thumb", base: [-0.28, -0.03, 0.04], spread: -0.35, length: [0.18, 0.15, 0.12], angle: -0.55 },
-  { name: "index", base: [-0.13, 0.22, 0.02], spread: -0.12, length: [0.22, 0.18, 0.14], angle: 0.12 },
-  { name: "middle", base: [0.0, 0.24, 0.02], spread: 0.0, length: [0.24, 0.2, 0.15], angle: 0.0 },
-  { name: "ring", base: [0.13, 0.22, 0.02], spread: 0.1, length: [0.22, 0.18, 0.14], angle: -0.1 },
-  { name: "pinky", base: [0.25, 0.17, 0.02], spread: 0.2, length: [0.18, 0.15, 0.12], angle: -0.22 },
+  { name: "thumb", base: [-0.31, -0.07, 0.045], spread: -0.42, length: [0.07, 0.13, 0.12, 0.095, 0.055], angle: -0.72, curlBias: 1.2 },
+  { name: "index", base: [-0.15, 0.18, 0.025], spread: -0.14, length: [0.08, 0.17, 0.15, 0.115, 0.06], angle: 0.12, curlBias: 1.0 },
+  { name: "middle", base: [0.0, 0.2, 0.025], spread: 0.0, length: [0.085, 0.185, 0.16, 0.12, 0.065], angle: 0.0, curlBias: 1.0 },
+  { name: "ring", base: [0.14, 0.18, 0.025], spread: 0.1, length: [0.08, 0.165, 0.145, 0.11, 0.06], angle: -0.1, curlBias: 1.0 },
+  { name: "pinky", base: [0.27, 0.13, 0.025], spread: 0.22, length: [0.07, 0.14, 0.12, 0.09, 0.052], angle: -0.24, curlBias: 1.05 },
 ];
 
 function clamp(value, low, high) {
@@ -127,24 +129,30 @@ function stepPredictor(state, target) {
 
 function buildHandJoints(frame) {
   const joints = {
-    wrist: { x: 0, y: -0.35, z: 0 },
+    wrist: { x: 0, y: -0.38, z: 0 },
+    wrist_left: { x: -0.18, y: -0.34, z: 0 },
+    wrist_right: { x: 0.18, y: -0.34, z: 0 },
     palm: { x: 0, y: 0, z: 0 },
-    palm_left: { x: -0.28, y: -0.02, z: 0 },
-    palm_right: { x: 0.28, y: -0.02, z: 0 },
+    palm_base_left: { x: -0.27, y: -0.14, z: 0 },
+    palm_base_right: { x: 0.27, y: -0.14, z: 0 },
+    palm_left: { x: -0.31, y: 0.08, z: 0 },
+    palm_right: { x: 0.31, y: 0.08, z: 0 },
+    palm_top: { x: 0, y: 0.22, z: 0.01 },
   };
 
   FINGERS.forEach((finger) => {
     let [x, y, z] = finger.base;
-    const curl = frame.grip * (finger.name === "thumb" ? 1.15 : 1);
+    const curl = frame.grip * finger.curlBias;
     const side = finger.spread;
     const baseAngle = finger.angle;
     finger.length.forEach((length, index) => {
-      const bend = curl * (0.45 + index * 0.34);
-      const dir = baseAngle + side * (1 - curl * 0.55);
-      x += Math.sin(dir) * length * (1 - curl * 0.2);
-      y += Math.cos(dir) * length * (1 - curl * 0.45);
-      z += Math.sin(bend) * (0.16 + index * 0.05);
-      joints[`${finger.name}_${index}`] = { x, y, z };
+      const bend = curl * (0.22 + index * 0.23);
+      const dir = baseAngle + side * (1 - curl * 0.5);
+      const reach = 1 - curl * (0.12 + index * 0.08);
+      x += Math.sin(dir) * length * reach;
+      y += Math.cos(dir) * length * (1 - curl * (0.16 + index * 0.075));
+      z += Math.sin(bend) * (0.055 + index * 0.038);
+      joints[`${finger.name}_${FINGER_JOINTS[index]}`] = { x, y, z };
     });
   });
   return joints;
@@ -167,12 +175,48 @@ function createHandRig(scene) {
   const rig = new THREE.Group();
   const jointMeshes = {};
   const bones = [];
-  const jointNames = ["wrist", "palm", "palm_left", "palm_right"];
-  FINGERS.forEach((finger) => finger.length.forEach((_, index) => jointNames.push(`${finger.name}_${index}`)));
+  const jointNames = [
+    "wrist",
+    "wrist_left",
+    "wrist_right",
+    "palm",
+    "palm_base_left",
+    "palm_base_right",
+    "palm_left",
+    "palm_right",
+    "palm_top",
+  ];
+  FINGERS.forEach((finger) => FINGER_JOINTS.forEach((joint) => jointNames.push(`${finger.name}_${joint}`)));
+
+  const palmShape = new THREE.Shape();
+  palmShape.moveTo(-0.27, -0.16);
+  palmShape.lineTo(0.27, -0.16);
+  palmShape.lineTo(0.32, 0.08);
+  palmShape.lineTo(0.2, 0.21);
+  palmShape.lineTo(-0.2, 0.21);
+  palmShape.lineTo(-0.32, 0.08);
+  palmShape.lineTo(-0.27, -0.16);
+  const palmMesh = new THREE.Mesh(
+    new THREE.ShapeGeometry(palmShape),
+    new THREE.MeshStandardMaterial({
+      color: 0x2f6fa8,
+      transparent: true,
+      opacity: 0.38,
+      roughness: 0.62,
+      metalness: 0.02,
+      side: THREE.DoubleSide,
+    })
+  );
+  palmMesh.position.z = -0.025;
+  palmMesh.receiveShadow = true;
+  rig.add(palmMesh);
 
   jointNames.forEach((name) => {
-    const radius = name === "palm" ? 0.075 : name === "wrist" ? 0.065 : 0.045;
-    const color = name.includes("thumb") ? 0xf59e0b : name.includes("palm") ? 0x93c5fd : 0x14b8a6;
+    const isPalm = name.includes("palm");
+    const isTip = name.endsWith("_tip");
+    const isWrist = name.includes("wrist");
+    const radius = name === "palm" ? 0.07 : isWrist ? 0.052 : isPalm ? 0.043 : isTip ? 0.038 : 0.033;
+    const color = name.includes("thumb") ? 0xf59e0b : isPalm || isWrist ? 0x93c5fd : isTip ? 0x5eead4 : 0x14b8a6;
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 24, 16), makeMaterial(color));
     mesh.castShadow = true;
     jointMeshes[name] = mesh;
@@ -181,17 +225,34 @@ function createHandRig(scene) {
 
   const bonePairs = [
     ["wrist", "palm"],
+    ["wrist_left", "wrist"],
+    ["wrist", "wrist_right"],
+    ["wrist_left", "palm_base_left"],
+    ["wrist_right", "palm_base_right"],
+    ["palm_base_left", "palm"],
+    ["palm", "palm_base_right"],
     ["palm_left", "palm"],
     ["palm", "palm_right"],
+    ["palm_left", "palm_top"],
+    ["palm_top", "palm_right"],
+    ["palm_base_left", "palm_left"],
+    ["palm_base_right", "palm_right"],
   ];
   FINGERS.forEach((finger) => {
-    bonePairs.push(["palm", `${finger.name}_0`]);
-    bonePairs.push([`${finger.name}_0`, `${finger.name}_1`]);
-    bonePairs.push([`${finger.name}_1`, `${finger.name}_2`]);
+    const anchor = finger.name === "thumb" ? "palm_left" : "palm_top";
+    bonePairs.push([anchor, `${finger.name}_metacarpal`]);
+    bonePairs.push([`${finger.name}_metacarpal`, `${finger.name}_mcp`]);
+    bonePairs.push([`${finger.name}_mcp`, `${finger.name}_pip`]);
+    bonePairs.push([`${finger.name}_pip`, `${finger.name}_dip`]);
+    bonePairs.push([`${finger.name}_dip`, `${finger.name}_tip`]);
   });
 
   bonePairs.forEach(([from, to]) => {
-    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 12), makeMaterial(0xd8e2ef));
+    const isPalmBone = from.includes("palm") || from.includes("wrist");
+    const mesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(isPalmBone ? 0.018 : 0.015, isPalmBone ? 0.018 : 0.015, 1, 12),
+      makeMaterial(isPalmBone ? 0x9db9d8 : 0xd8e2ef)
+    );
     mesh.castShadow = true;
     bones.push({ from, to, mesh });
     rig.add(mesh);
@@ -249,6 +310,7 @@ function App() {
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
     let renderer;
+    let controls;
     let frameId = 0;
 
     try {
@@ -264,6 +326,12 @@ function App() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     mount.appendChild(renderer.domElement);
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 0.08, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 1.0;
+    controls.maxDistance = 4.2;
 
     const hemi = new THREE.HemisphereLight(0xb7d7ff, 0x111923, 1.7);
     const key = new THREE.DirectionalLight(0xffffff, 2.4);
@@ -286,6 +354,7 @@ function App() {
     };
     const animate = () => {
       applyHandFrame(parts, frameRef.current);
+      controls.update();
       renderer.render(scene, camera);
       frameId = requestAnimationFrame(animate);
     };
@@ -296,6 +365,7 @@ function App() {
     return () => {
       cancelAnimationFrame(frameId);
       window.removeEventListener("resize", resize);
+      controls.dispose();
       renderer.dispose();
       mount.removeChild(renderer.domElement);
     };
