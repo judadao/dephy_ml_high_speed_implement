@@ -67,7 +67,7 @@ dephy_hand_predictor_config_t dephy_hand_predictor_default_config(void)
     config.kp_rot = 7.0f;
     config.kd_rot = 1.8f;
     config.kp_grip = 8.0f;
-    config.observation_correction = 0.65f;
+    config.observation_correction = 0.35f;
     return config;
 }
 

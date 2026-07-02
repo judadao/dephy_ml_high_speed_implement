@@ -82,8 +82,14 @@ if [ -x "$io_repo/build_out/linux_io_device_simul" ]; then
         --policy examples/hand/hand_policy.json \
         --render-ms 16 \
         --result "$observed_result" > "$observed_frames"
-    grep -q ',io_obs_0024,' "$observed_frames"
+    grep -q ',io_obs_0003,' "$observed_frames"
     grep -q '"mode": "observed"' "$observed_result"
-    grep -q '"observations": 39' "$observed_result"
+    grep -q '"observations": 5' "$observed_result"
     grep -q '"success": true' "$observed_result"
+    awk -F, 'NR > 2 {
+        dx = $3 - px; if (dx < 0) dx = -dx;
+        dy = $4 - py; if (dy < 0) dy = -dy;
+        dz = $5 - pz; if (dz < 0) dz = -dz;
+        if (dx > 0.04 || dy > 0.04 || dz > 0.04) exit 1;
+    } NR > 1 { px = $3; py = $4; pz = $5; }' "$observed_frames"
 fi

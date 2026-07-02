@@ -201,6 +201,16 @@ build_out/dephy_hand_predict \
   > build_out/hand_io_observed_frames.csv
 ```
 
+Observed mode is intentionally smoother than directly snapping to IO:
+
+- Prediction between observations ignores `safety_hold` so the model can move
+  toward the next pose instead of freezing early.
+- `safety_hold` is applied when the observation is actually received, stopping
+  velocity at that anchor.
+- `observation_correction` controls how strongly observed IO pulls the current
+  state. The default is conservative to reduce visible jitter, and policies can
+  override it.
+
 Or train a new policy from recorded/scenario keyframes:
 
 ```sh

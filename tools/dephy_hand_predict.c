@@ -124,6 +124,9 @@ static int load_policy_config(const char *path, dephy_hand_predictor_config_t *c
         config->max_rot_speed *= value;
         config->max_grip_speed *= value;
     }
+    if (json_find_f32(json, "observation_correction", &value) == 0 && value >= 0.0f && value <= 1.0f) {
+        config->observation_correction = value;
+    }
     return 0;
 }
 
@@ -457,11 +460,14 @@ int main(int argc, char **argv)
 
         if (observed_input) {
             uint32_t target_time = target->t_ms > state.t_ms ? target->t_ms : state.t_ms + config.render_period_ms;
+            dephy_hand_keyframe_t predicted_target = *target;
+
+            predicted_target.safety_hold = 0;
 
             while (state.t_ms + config.render_period_ms <= target_time && guard_frames < 20000) {
                 dephy_hand_state_t next;
 
-                dephy_hand_predict_step(&config, &state, target, &next);
+                dephy_hand_predict_step(&config, &state, &predicted_target, &next);
                 state = next;
                 print_state(&state, target);
                 ++prediction_frames;
