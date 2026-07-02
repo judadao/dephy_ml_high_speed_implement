@@ -6,7 +6,7 @@ export const CAN_WORLD_CENTER = new THREE.Vector3(0.15, 0.26 + SCENE_Y_OFFSET, 0
 export const CAN_RADIUS = 0.105;
 export const CAN_HALF_HEIGHT = 0.29;
 export const FINGER_JOINTS = ["metacarpal", "mcp", "pip", "dip", "tip"];
-const PALM_COLLISION_JOINTS = ["palm", "palm_top", "palm_left", "palm_right", "palm_base_left", "palm_base_right"];
+const PALM_COLLISION_JOINTS = ["palm", "palm_top", "palm_left", "palm_right"];
 export const FINGERS = [
   { name: "thumb", base: [-0.31, -0.07, 0.045], spread: -0.42, length: [0.07, 0.13, 0.12, 0.095, 0.055], angle: -0.72, curlBias: 1.2 },
   { name: "index", base: [-0.15, 0.18, 0.025], spread: -0.14, length: [0.08, 0.17, 0.15, 0.115, 0.06], angle: 0.12, curlBias: 1.0 },
@@ -125,42 +125,74 @@ function keepFingerJointsOutsideCan(joints, frame) {
   const can = canInHandSpace(frame);
   const approachGuard = 0.16 * smoothstep((0.74 - can.center.length()) / 0.3);
 
-  const collisionJoints = [
-    ...PALM_COLLISION_JOINTS.map((name) => ({ name, clearance: 0.09 / HAND_SCALE, fallback: new THREE.Vector3(-0.2, 0, 0.1).normalize() })),
-    ...FINGERS.flatMap((finger) =>
+  keepPalmOutsideCan(joints, can);
+
+  for (let pass = 0; pass < 3; pass += 1) {
+    FINGERS.flatMap((finger) =>
       FINGER_JOINTS.map((joint, index) => ({
         name: `${finger.name}_${joint}`,
         clearance: (index >= 3 ? 0.06 : 0.045) / HAND_SCALE,
         fallback: new THREE.Vector3(finger.base[0] || 0.01, 0, 0.12).normalize(),
       }))
-    ),
-  ];
-
-  for (let pass = 0; pass < 3; pass += 1) {
-    collisionJoints.forEach(({ name, clearance, fallback }) => {
+    ).forEach(({ name, clearance, fallback }) => {
       const pose = joints[name];
-      const point = new THREE.Vector3(pose.x, pose.y, pose.z);
-      const offset = point.clone().sub(can.center);
-      const axialDistance = offset.dot(can.axis);
-      if (Math.abs(axialDistance) > can.halfHeight + 0.08) {
+      const correction = canCorrectionForPoint(pose, can, clearance, fallback);
+      if (!correction) {
         return;
       }
-      const axial = can.axis.clone().multiplyScalar(axialDistance);
-      const radial = offset.sub(axial);
-      const radialDistance = radial.length();
-      const minimumDistance = can.radius + clearance;
-      if (radialDistance >= minimumDistance) {
-        return;
-      }
-      const penetration = smoothstep((minimumDistance - radialDistance) / minimumDistance);
+      const penetration = smoothstep(correction.depth / correction.minimumDistance);
       const collisionStrength = hardLock || penetration > 0 ? 1 : Math.max(gripClose, approachGuard * penetration);
-      const normal = radialDistance > 0.001 ? radial.normalize() : fallback;
-      const corrected = can.center.clone().add(axial).add(normal.multiplyScalar(minimumDistance + 0.002));
-      pose.x = pose.x * (1 - collisionStrength) + corrected.x * collisionStrength;
-      pose.y = pose.y * (1 - collisionStrength) + corrected.y * collisionStrength;
-      pose.z = pose.z * (1 - collisionStrength) + corrected.z * collisionStrength;
+      pose.x += correction.vector.x * collisionStrength;
+      pose.y += correction.vector.y * collisionStrength;
+      pose.z += correction.vector.z * collisionStrength;
     });
   }
+}
+
+function keepPalmOutsideCan(joints, can) {
+  for (let pass = 0; pass < 8; pass += 1) {
+    let correction = null;
+    PALM_COLLISION_JOINTS.forEach((name) => {
+      const candidate = canCorrectionForPoint(joints[name], can, 0.09 / HAND_SCALE, new THREE.Vector3(-0.2, 0, 0.1).normalize());
+      if (!candidate) {
+        return;
+      }
+      if (!correction || candidate.depth > correction.depth) {
+        correction = candidate;
+      }
+    });
+    if (!correction) {
+      return;
+    }
+    Object.values(joints).forEach((pose) => {
+      pose.x += correction.vector.x;
+      pose.y += correction.vector.y;
+      pose.z += correction.vector.z;
+    });
+  }
+}
+
+function canCorrectionForPoint(pose, can, clearance, fallback) {
+  const point = new THREE.Vector3(pose.x, pose.y, pose.z);
+  const offset = point.clone().sub(can.center);
+  const axialDistance = offset.dot(can.axis);
+  if (Math.abs(axialDistance) > can.halfHeight + 0.08) {
+    return null;
+  }
+  const axial = can.axis.clone().multiplyScalar(axialDistance);
+  const radial = offset.sub(axial);
+  const radialDistance = radial.length();
+  const minimumDistance = can.radius + clearance;
+  if (radialDistance >= minimumDistance) {
+    return null;
+  }
+  const normal = radialDistance > 0.001 ? radial.normalize() : fallback;
+  const corrected = can.center.clone().add(axial).add(normal.multiplyScalar(minimumDistance + 0.002));
+  return {
+    depth: minimumDistance - radialDistance,
+    minimumDistance,
+    vector: corrected.sub(point),
+  };
 }
 
 export function canClearanceMetrics(frame, joints = buildHandJoints(frame)) {
