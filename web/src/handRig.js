@@ -105,7 +105,23 @@ export function buildHandJoints(frame) {
   });
   keepFingerJointsOutsideCan(joints, frame);
   keepFingersOnPartialCanWrap(joints, frame);
+  keepFingertipsBehindCan(joints, frame);
+  keepFingerJointsOutsideCan(joints, frame);
   return joints;
+}
+
+function localPointToWorld(frame, pose) {
+  const point = new THREE.Vector3(pose.x, pose.y, pose.z).multiplyScalar(HAND_SCALE);
+  point.applyEuler(new THREE.Euler(-0.35 + frame.pitch, frame.yaw, frame.roll));
+  point.add(new THREE.Vector3(frame.x * 1.8, frame.y * 1.8 + SCENE_Y_OFFSET, frame.z * 1.8));
+  return point;
+}
+
+function worldPointToLocal(frame, point) {
+  const local = point.clone().sub(new THREE.Vector3(frame.x * 1.8, frame.y * 1.8 + SCENE_Y_OFFSET, frame.z * 1.8));
+  const inverse = new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.35 + frame.pitch, frame.yaw, frame.roll)).invert();
+  local.applyQuaternion(inverse).divideScalar(HAND_SCALE);
+  return { x: local.x, y: local.y, z: local.z };
 }
 
 function canInHandSpace(frame) {
@@ -216,6 +232,29 @@ function keepPointOutsideCanAtCurrentY(pose, can, clearance) {
   const corrected = can.center.clone().add(axial).add(radial);
   pose.x = corrected.x;
   pose.z = corrected.z;
+}
+
+function keepFingertipsBehindCan(joints, frame) {
+  const active = frame.grip > 0.24 || frame.roll < -0.82;
+  if (!active) {
+    return;
+  }
+  const maxWorldZ = CAN_WORLD_CENTER.z - 0.012;
+  ["index_dip", "index_tip", "middle_dip", "middle_tip", "ring_dip", "ring_tip", "pinky_dip", "pinky_tip"].forEach((name) => {
+    const pose = joints[name];
+    if (!pose) {
+      return;
+    }
+    const world = localPointToWorld(frame, pose);
+    if (world.z <= maxWorldZ) {
+      return;
+    }
+    world.z = maxWorldZ;
+    const local = worldPointToLocal(frame, world);
+    pose.x = local.x;
+    pose.y = local.y;
+    pose.z = local.z;
+  });
 }
 
 export function canClearanceMetrics(frame, joints = buildHandJoints(frame)) {
