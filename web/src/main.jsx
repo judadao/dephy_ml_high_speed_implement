@@ -74,6 +74,11 @@ function clamp(value, low, high) {
   return Math.max(low, Math.min(high, value));
 }
 
+function smoothstep(value) {
+  const t = clamp(value, 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
 function parseCsv(text) {
   const [headerLine, ...rows] = text.trim().split(/\r?\n/);
   const headers = headerLine.split(",");
@@ -291,7 +296,7 @@ function buildHandJoints(frame) {
   FINGERS.forEach((finger) => {
     let [x, y, z] = finger.base;
     const curl = clamp(frame.grip * finger.curlBias, 0, 1);
-    const close = clamp((curl - 0.55) / 0.45, 0, 1);
+    const close = smoothstep((curl - 0.25) / 0.75);
     const side = finger.spread;
     const baseAngle = finger.angle;
     finger.length.forEach((length, index) => {
@@ -326,14 +331,13 @@ function buildHandJoints(frame) {
 }
 
 function keepFingerJointsOutsideCan(joints, frame) {
-  const gripClose = clamp((frame.grip - 0.5) / 0.5, 0, 1);
+  const gripClose = smoothstep((frame.grip - 0.32) / 0.68);
   const rigPosition = new THREE.Vector3(frame.x * 1.8, frame.y * 1.8 + SCENE_Y_OFFSET, frame.z * 1.8);
   const rigRotation = new THREE.Euler(-0.35 + frame.pitch, frame.yaw, frame.roll);
   const inverseRig = new THREE.Quaternion().setFromEuler(rigRotation).invert();
   const canCenter = CAN_WORLD_CENTER.clone().sub(rigPosition).applyQuaternion(inverseRig).divideScalar(HAND_SCALE);
-  const proximity = clamp((0.78 - canCenter.length()) / 0.38, 0, 1);
-  const collisionStrength = Math.max(gripClose, proximity);
-  if (collisionStrength <= 0) {
+  const approachGuard = 0.16 * smoothstep((0.74 - canCenter.length()) / 0.3);
+  if (gripClose <= 0 && approachGuard <= 0) {
     return;
   }
   const canAxis = new THREE.Vector3(0, 1, 0).applyQuaternion(inverseRig).normalize();
@@ -358,6 +362,8 @@ function keepFingerJointsOutsideCan(joints, frame) {
       if (radialDistance >= minimumDistance) {
         return;
       }
+      const penetration = smoothstep((minimumDistance - radialDistance) / minimumDistance);
+      const collisionStrength = Math.max(gripClose, approachGuard * penetration);
       const fallbackNormal = new THREE.Vector3(finger.base[0] || 0.01, 0, 0.12).normalize();
       const normal = radialDistance > 0.001 ? radial.normalize() : fallbackNormal;
       const corrected = canCenter.clone().add(axial).add(normal.multiplyScalar(minimumDistance));
