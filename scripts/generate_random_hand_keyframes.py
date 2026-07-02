@@ -57,6 +57,40 @@ def gesture_pose(index: int, count: int, rng: random.Random) -> list[float]:
     ]
 
 
+def grasp_can_pose(index: int, count: int, rng: random.Random) -> list[float]:
+    poses = [
+        [-0.24, -0.02, 0.02, -0.18, 0.04, -0.06, 0.05],
+        [-0.18, -0.01, 0.02, -0.12, 0.03, -0.04, 0.05],
+        [-0.10, 0.00, 0.025, -0.06, 0.02, -0.02, 0.12],
+        [-0.03, 0.01, 0.03, -0.02, 0.01, 0.00, 0.30],
+        [0.03, 0.015, 0.035, 0.02, 0.00, 0.02, 0.68],
+        [0.075, 0.02, 0.04, 0.04, -0.01, 0.03, 1.00],
+        [0.08, 0.02, 0.04, 0.04, -0.01, 0.03, 1.00],
+        [0.075, 0.02, 0.04, 0.04, -0.01, 0.03, 0.62],
+        [0.03, 0.01, 0.035, 0.01, 0.00, 0.01, 0.22],
+        [-0.06, 0.00, 0.03, -0.04, 0.02, -0.02, 0.08],
+        [-0.16, -0.01, 0.025, -0.11, 0.03, -0.04, 0.05],
+        [-0.24, -0.02, 0.02, -0.18, 0.04, -0.06, 0.05],
+    ]
+    if count <= len(poses):
+        pose = poses[min(index, len(poses) - 1)][:]
+    else:
+        scaled = index * (len(poses) - 1) / max(count - 1, 1)
+        low = int(scaled)
+        high = min(low + 1, len(poses) - 1)
+        t = scaled - low
+        pose = [poses[low][axis] + (poses[high][axis] - poses[low][axis]) * t for axis in range(7)]
+    return [
+        pose[0] + rng.uniform(-0.01, 0.01),
+        pose[1] + rng.uniform(-0.008, 0.008),
+        pose[2] + rng.uniform(-0.006, 0.006),
+        pose[3] + rng.uniform(-0.015, 0.015),
+        pose[4] + rng.uniform(-0.012, 0.012),
+        pose[5] + rng.uniform(-0.012, 0.012),
+        clamp(pose[6] + rng.uniform(-0.025, 0.025), 0.0, 1.0),
+    ]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--out", required=True)
@@ -65,7 +99,7 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--template", help="optional clean keyframe CSV to perturb with IO noise")
     parser.add_argument("--noise-scale", type=float, default=0.0, help="apply bounded IO-like error to every keyframe")
-    parser.add_argument("--mode", choices=["random", "gesture"], default="random")
+    parser.add_argument("--mode", choices=["random", "gesture", "grasp_can"], default="random")
     args = parser.parse_args()
 
     if args.count < 2:
@@ -84,7 +118,12 @@ def main() -> int:
                 frame_id = f"{row['frame_id']}_noisy"
                 t_ms = int(row["t_ms"])
             else:
-                pose = gesture_pose(index, args.count, rng) if args.mode == "gesture" else rand_pose(rng)
+                if args.mode == "grasp_can":
+                    pose = grasp_can_pose(index, args.count, rng)
+                elif args.mode == "gesture":
+                    pose = gesture_pose(index, args.count, rng)
+                else:
+                    pose = rand_pose(rng)
                 frame_id = "random_init" if index == 0 else f"random_target_{index:04d}"
                 t_ms = index * args.sample_ms
             pose = noisy_pose(pose, rng, args.noise_scale)

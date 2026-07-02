@@ -74,21 +74,21 @@ grep -q '"success": true' "$outdir/full_random_result.json"
 test "$(($(wc -l < "$outdir/full_random_prediction.csv") - 1))" -eq 4005
 
 python3 scripts/generate_random_hand_keyframes.py \
-    --out "$outdir/gesture_keyframes.csv" \
+    --out "$outdir/grasp_can_keyframes.csv" \
     --count 12 \
     --sample-ms 300 \
     --seed 303 \
     --noise-scale 1.25 \
-    --mode gesture
+    --mode grasp_can
 
 python3 scripts/dephy_hand_sequence_predict.py \
-    --keyframes "$outdir/gesture_keyframes.csv" \
+    --keyframes "$outdir/grasp_can_keyframes.csv" \
     --model "$outdir/model.json" \
-    --out "$outdir/gesture_prediction.csv" \
-    --result "$outdir/gesture_result.json" \
+    --out "$outdir/grasp_can_prediction.csv" \
+    --result "$outdir/grasp_can_result.json" \
     --render-ms 16 \
     --frames 1000
 
-grep -q '"success": true' "$outdir/gesture_result.json"
-test "$(($(wc -l < "$outdir/gesture_prediction.csv") - 1))" -eq 11012
-grep -q '"intermediate_prediction_frames": 11000' "$outdir/gesture_result.json"
+grep -q '"success": true' "$outdir/grasp_can_result.json"
+test "$(($(wc -l < "$outdir/grasp_can_prediction.csv") - 1))" -eq 11012
+grep -q '"intermediate_prediction_frames": 11000' "$outdir/grasp_can_result.json"

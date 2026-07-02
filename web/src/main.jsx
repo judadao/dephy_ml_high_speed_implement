@@ -369,6 +369,43 @@ function createHandRig(scene) {
   return { rig, jointMeshes, bones };
 }
 
+function createCanTarget(scene) {
+  const group = new THREE.Group();
+  group.position.set(0.15, 0.26, 0.03);
+
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.105, 0.105, 0.58, 48),
+    new THREE.MeshStandardMaterial({
+      color: 0xb7c4d3,
+      roughness: 0.42,
+      metalness: 0.38,
+      transparent: true,
+      opacity: 0.78,
+    })
+  );
+  body.castShadow = true;
+  body.receiveShadow = true;
+  group.add(body);
+
+  const lidMaterial = new THREE.MeshStandardMaterial({ color: 0xe7eef8, roughness: 0.35, metalness: 0.55 });
+  [-0.295, 0.295].forEach((y) => {
+    const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.108, 0.108, 0.014, 48), lidMaterial);
+    lid.position.y = y;
+    lid.castShadow = true;
+    group.add(lid);
+  });
+
+  const label = new THREE.Mesh(
+    new THREE.BoxGeometry(0.012, 0.34, 0.16),
+    new THREE.MeshStandardMaterial({ color: 0x14b8a6, roughness: 0.5, metalness: 0.08 })
+  );
+  label.position.set(0.106, 0, 0);
+  group.add(label);
+
+  scene.add(group);
+  return group;
+}
+
 function applyHandFrame(parts, frame) {
   const joints = buildHandJoints(frame);
   parts.rig.position.set(frame.x * 1.8, frame.y * 1.8, frame.z * 1.8);
@@ -654,13 +691,13 @@ function App() {
     }
 
     scene.background = new THREE.Color(0x0b0f14);
-    camera.position.set(0, 0.25, 2.35);
-    camera.lookAt(0, 0.08, 0);
+    camera.position.set(0, 0.25, 3.05);
+    camera.lookAt(0.02, 0.12, 0);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     mount.appendChild(renderer.domElement);
     controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(0, 0.08, 0);
+    controls.target.set(0.02, 0.12, 0);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controls.minDistance = 1.0;
@@ -677,6 +714,7 @@ function App() {
     grid.position.z = -0.22;
     scene.add(grid);
 
+    createCanTarget(scene);
     const parts = createHandRig(scene);
     const resize = () => {
       const width = mount.clientWidth;
