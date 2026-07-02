@@ -12,6 +12,10 @@ const RESULT_URL = "/demo/hand_sequence/result.json";
 const RENDER_MS = 16;
 const ANCHOR_MS = 300;
 const SCENE_Y_OFFSET = 0.62;
+const HAND_SCALE = 0.64;
+const CAN_WORLD_CENTER = new THREE.Vector3(0.15, 0.26 + SCENE_Y_OFFSET, 0.03);
+const CAN_RADIUS = 0.105;
+const CAN_HALF_HEIGHT = 0.29;
 const DEFAULT_POLICY = {
   format: "dephy_hand_policy_v1",
   kp_pos: 8.5,
@@ -28,6 +32,43 @@ const FINGERS = [
   { name: "ring", base: [0.14, 0.18, 0.025], spread: 0.1, length: [0.08, 0.165, 0.145, 0.11, 0.06], angle: -0.1, curlBias: 1.0 },
   { name: "pinky", base: [0.27, 0.13, 0.025], spread: 0.22, length: [0.07, 0.14, 0.12, 0.09, 0.052], angle: -0.24, curlBias: 1.05 },
 ];
+const CAN_GRASP_JOINT_TARGETS = {
+  thumb: [
+    [-0.28, -0.035, 0.07],
+    [-0.21, 0.025, 0.12],
+    [-0.13, 0.075, 0.16],
+    [-0.055, 0.115, 0.18],
+    [0.01, 0.135, 0.175],
+  ],
+  index: [
+    [-0.145, 0.255, 0.065],
+    [-0.125, 0.315, 0.125],
+    [-0.095, 0.275, 0.19],
+    [-0.07, 0.215, 0.215],
+    [-0.052, 0.165, 0.195],
+  ],
+  middle: [
+    [0.0, 0.275, 0.065],
+    [0.0, 0.335, 0.13],
+    [0.0, 0.29, 0.2],
+    [0.0, 0.225, 0.225],
+    [0.0, 0.17, 0.205],
+  ],
+  ring: [
+    [0.135, 0.255, 0.065],
+    [0.115, 0.315, 0.125],
+    [0.088, 0.275, 0.19],
+    [0.064, 0.215, 0.215],
+    [0.046, 0.165, 0.195],
+  ],
+  pinky: [
+    [0.245, 0.205, 0.06],
+    [0.215, 0.26, 0.115],
+    [0.18, 0.235, 0.175],
+    [0.145, 0.185, 0.2],
+    [0.115, 0.145, 0.18],
+  ],
+};
 
 function clamp(value, low, high) {
   return Math.max(low, Math.min(high, value));
@@ -249,24 +290,82 @@ function buildHandJoints(frame) {
 
   FINGERS.forEach((finger) => {
     let [x, y, z] = finger.base;
-    const curl = frame.grip * finger.curlBias;
+    const curl = clamp(frame.grip * finger.curlBias, 0, 1);
+    const close = clamp((curl - 0.55) / 0.45, 0, 1);
     const side = finger.spread;
     const baseAngle = finger.angle;
     finger.length.forEach((length, index) => {
-      const bend = curl * (0.36 + index * 0.36);
-      const dir = baseAngle + side * (1 - curl * 0.5);
-      const reach = 1 - curl * (0.18 + index * 0.12);
-      const inward = curl * curl * 0.018 * (index + 1) * (finger.name === "thumb" ? 1.4 : -Math.sign(finger.spread || 0.02));
-      const palmward = finger.name === "thumb" ? 0 : curl * curl * 0.052 * (index + 1);
-      x += Math.sin(dir) * length * reach;
+      const fingerSign = Math.sign(finger.spread || 0.02);
+      const bend = curl * (0.58 + index * 0.5);
+      const dir = baseAngle + side * (1 - curl * 0.58);
+      const reach = 1 - curl * (0.28 + index * 0.16);
+      const inward = curl * curl * 0.026 * (index + 1) * (finger.name === "thumb" ? 1.7 : -fingerSign);
+      const palmward = finger.name === "thumb" ? curl * curl * 0.01 * index : curl * curl * 0.083 * (index + 1);
+      x += Math.sin(dir) * length * Math.max(reach, 0.18);
       x += inward;
-      y += Math.cos(dir) * length * (1 - curl * (0.42 + index * 0.19));
+      y += Math.cos(dir) * length * (1 - curl * (0.58 + index * 0.26));
       y -= palmward;
-      z += Math.sin(bend) * (0.065 + index * 0.052);
+      z += Math.sin(bend) * (0.082 + index * 0.066);
+      if (finger.name === "thumb") {
+        const [targetX, targetY, targetZ] = CAN_GRASP_JOINT_TARGETS.thumb[index];
+        x += close * 0.028 * (index + 1);
+        x = x * (1 - close) + targetX * close;
+        y = y * (1 - close) + targetY * close;
+        z = z * (1 - close) + targetZ * close;
+      } else {
+        const [targetX, targetY, targetZ] = CAN_GRASP_JOINT_TARGETS[finger.name][index];
+        x = x * (1 - close) + targetX * close;
+        y = y * (1 - close) + targetY * close;
+        z = z * (1 - close) + targetZ * close;
+      }
       joints[`${finger.name}_${FINGER_JOINTS[index]}`] = { x, y, z };
     });
   });
+  keepFingerJointsOutsideCan(joints, frame);
   return joints;
+}
+
+function keepFingerJointsOutsideCan(joints, frame) {
+  const gripClose = clamp((frame.grip - 0.5) / 0.5, 0, 1);
+  const rigPosition = new THREE.Vector3(frame.x * 1.8, frame.y * 1.8 + SCENE_Y_OFFSET, frame.z * 1.8);
+  const rigRotation = new THREE.Euler(-0.35 + frame.pitch, frame.yaw, frame.roll);
+  const inverseRig = new THREE.Quaternion().setFromEuler(rigRotation).invert();
+  const canCenter = CAN_WORLD_CENTER.clone().sub(rigPosition).applyQuaternion(inverseRig).divideScalar(HAND_SCALE);
+  const proximity = clamp((0.78 - canCenter.length()) / 0.38, 0, 1);
+  const collisionStrength = Math.max(gripClose, proximity);
+  if (collisionStrength <= 0) {
+    return;
+  }
+  const canAxis = new THREE.Vector3(0, 1, 0).applyQuaternion(inverseRig).normalize();
+  const canRadius = CAN_RADIUS / HAND_SCALE;
+  const canHalfHeight = CAN_HALF_HEIGHT / HAND_SCALE;
+
+  FINGERS.forEach((finger) => {
+    FINGER_JOINTS.forEach((joint, index) => {
+      const name = `${finger.name}_${joint}`;
+      const pose = joints[name];
+      const point = new THREE.Vector3(pose.x, pose.y, pose.z);
+      const offset = point.clone().sub(canCenter);
+      const axialDistance = offset.dot(canAxis);
+      if (Math.abs(axialDistance) > canHalfHeight + 0.08) {
+        return;
+      }
+      const axial = canAxis.clone().multiplyScalar(axialDistance);
+      const radial = offset.sub(axial);
+      const radialDistance = radial.length();
+      const jointClearance = (index >= 3 ? 0.06 : 0.045) / HAND_SCALE;
+      const minimumDistance = canRadius + jointClearance;
+      if (radialDistance >= minimumDistance) {
+        return;
+      }
+      const fallbackNormal = new THREE.Vector3(finger.base[0] || 0.01, 0, 0.12).normalize();
+      const normal = radialDistance > 0.001 ? radial.normalize() : fallbackNormal;
+      const corrected = canCenter.clone().add(axial).add(normal.multiplyScalar(minimumDistance));
+      pose.x = pose.x * (1 - collisionStrength) + corrected.x * collisionStrength;
+      pose.y = pose.y * (1 - collisionStrength) + corrected.y * collisionStrength;
+      pose.z = pose.z * (1 - collisionStrength) + corrected.z * collisionStrength;
+    });
+  });
 }
 
 function makeMaterial(color) {
@@ -370,7 +469,7 @@ function createHandRig(scene) {
   });
 
   rig.rotation.x = -0.35;
-  rig.scale.setScalar(0.64);
+  rig.scale.setScalar(HAND_SCALE);
   scene.add(rig);
   return { rig, jointMeshes, bones };
 }
