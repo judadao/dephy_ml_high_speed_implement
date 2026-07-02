@@ -4,177 +4,251 @@ import { Pause, Play, RotateCcw } from "lucide-react";
 import * as THREE from "three";
 import "./styles.css";
 
-const JOINTS = [
-  "root",
-  "pelvis",
-  "spine_0",
-  "spine_1",
-  "neck",
-  "head",
-  "left_shoulder",
-  "left_elbow",
-  "left_wrist",
-  "right_shoulder",
-  "right_elbow",
-  "right_wrist",
-  "left_hip",
-  "left_knee",
-  "left_ankle",
-  "right_hip",
-  "right_knee",
-  "right_ankle",
-  "center_mass",
+const KEYFRAME_CSV = `frame_id,t_ms,x,y,z,yaw,pitch,roll,grip,hold_ms,tolerance,safety_hold
+open_start,0,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0,0.012,0
+half_close,300,0.10,0.04,0.02,0.18,-0.06,0.08,0.45,0,0.012,0
+closed_reach,600,0.22,0.08,0.04,0.28,-0.12,0.14,1.00,0,0.012,0
+half_open,900,0.10,0.02,0.00,0.10,-0.04,0.06,0.35,0,0.012,0
+open_return,1200,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0,0.012,0`;
+
+const RENDER_MS = 16;
+const ANCHOR_MS = 300;
+const FINGERS = [
+  { name: "thumb", base: [-0.28, -0.03, 0.04], spread: -0.35, length: [0.18, 0.15, 0.12], angle: -0.55 },
+  { name: "index", base: [-0.13, 0.22, 0.02], spread: -0.12, length: [0.22, 0.18, 0.14], angle: 0.12 },
+  { name: "middle", base: [0.0, 0.24, 0.02], spread: 0.0, length: [0.24, 0.2, 0.15], angle: 0.0 },
+  { name: "ring", base: [0.13, 0.22, 0.02], spread: 0.1, length: [0.22, 0.18, 0.14], angle: -0.1 },
+  { name: "pinky", base: [0.25, 0.17, 0.02], spread: 0.2, length: [0.18, 0.15, 0.12], angle: -0.22 },
 ];
 
-const BONES = [
-  ["root", "pelvis"],
-  ["pelvis", "spine_0"],
-  ["spine_0", "spine_1"],
-  ["spine_1", "neck"],
-  ["neck", "head"],
-  ["spine_1", "left_shoulder"],
-  ["left_shoulder", "left_elbow"],
-  ["left_elbow", "left_wrist"],
-  ["spine_1", "right_shoulder"],
-  ["right_shoulder", "right_elbow"],
-  ["right_elbow", "right_wrist"],
-  ["pelvis", "left_hip"],
-  ["left_hip", "left_knee"],
-  ["left_knee", "left_ankle"],
-  ["pelvis", "right_hip"],
-  ["right_hip", "right_knee"],
-  ["right_knee", "right_ankle"],
-  ["pelvis", "center_mass"],
-];
-
-function makeMaterial(color) {
-  return new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.08 });
+function clamp(value, low, high) {
+  return Math.max(low, Math.min(high, value));
 }
 
-function makeBoneMesh(color) {
-  const geometry = new THREE.CylinderGeometry(0.035, 0.035, 1, 12);
-  const mesh = new THREE.Mesh(geometry, makeMaterial(color));
-  mesh.castShadow = true;
-  return mesh;
+function parseCsv(text) {
+  const [headerLine, ...rows] = text.trim().split(/\r?\n/);
+  const headers = headerLine.split(",");
+  return rows.map((row) => {
+    const values = row.split(",");
+    const item = Object.fromEntries(headers.map((key, index) => [key, values[index]]));
+    return {
+      frame_id: item.frame_id,
+      t_ms: Number(item.t_ms),
+      x: Number(item.x),
+      y: Number(item.y),
+      z: Number(item.z),
+      yaw: Number(item.yaw),
+      pitch: Number(item.pitch),
+      roll: Number(item.roll),
+      grip: Number(item.grip),
+      hold_ms: Number(item.hold_ms),
+      tolerance: Number(item.tolerance),
+      safety_hold: Number(item.safety_hold),
+    };
+  });
+}
+
+function initialState(keyframe) {
+  return {
+    frame_t_ms: keyframe.t_ms,
+    targetIndex: 0,
+    x: keyframe.x,
+    y: keyframe.y,
+    z: keyframe.z,
+    yaw: keyframe.yaw,
+    pitch: keyframe.pitch,
+    roll: keyframe.roll,
+    grip: keyframe.grip,
+    vx: 0,
+    vy: 0,
+    vz: 0,
+    error: 0,
+    confidence: 0.95,
+    csvLine: 1,
+    anchorLoop: 1,
+  };
+}
+
+function errorToTarget(state, target) {
+  const pos = Math.hypot(target.x - state.x, target.y - state.y, target.z - state.z);
+  const rot = Math.hypot(target.yaw - state.yaw, target.pitch - state.pitch, target.roll - state.roll) * 0.2;
+  const grip = Math.abs(target.grip - state.grip) * 0.1;
+  return pos + rot + grip;
+}
+
+function stepPredictor(state, target) {
+  const dt = RENDER_MS / 1000;
+  const kp = 8.5;
+  const kd = 2.1;
+  const maxSpeed = 1.25;
+  const maxAccel = 6.5;
+  let desiredVx = (target.x - state.x) * kp - state.vx * kd;
+  let desiredVy = (target.y - state.y) * kp - state.vy * kd;
+  let desiredVz = (target.z - state.z) * kp - state.vz * kd;
+  const desiredLen = Math.hypot(desiredVx, desiredVy, desiredVz);
+  if (desiredLen > maxSpeed) {
+    desiredVx = (desiredVx / desiredLen) * maxSpeed;
+    desiredVy = (desiredVy / desiredLen) * maxSpeed;
+    desiredVz = (desiredVz / desiredLen) * maxSpeed;
+  }
+
+  let dvx = desiredVx - state.vx;
+  let dvy = desiredVy - state.vy;
+  let dvz = desiredVz - state.vz;
+  const dvLen = Math.hypot(dvx, dvy, dvz);
+  const maxDv = maxAccel * dt;
+  if (dvLen > maxDv) {
+    dvx = (dvx / dvLen) * maxDv;
+    dvy = (dvy / dvLen) * maxDv;
+    dvz = (dvz / dvLen) * maxDv;
+  }
+
+  const vx = state.vx + dvx;
+  const vy = state.vy + dvy;
+  const vz = state.vz + dvz;
+  const next = {
+    ...state,
+    frame_t_ms: state.frame_t_ms + RENDER_MS,
+    x: state.x + vx * dt,
+    y: state.y + vy * dt,
+    z: state.z + vz * dt,
+    yaw: state.yaw + clamp(target.yaw - state.yaw, -3.2 * dt, 3.2 * dt),
+    pitch: state.pitch + clamp(target.pitch - state.pitch, -3.2 * dt, 3.2 * dt),
+    roll: state.roll + clamp(target.roll - state.roll, -3.2 * dt, 3.2 * dt),
+    grip: clamp(state.grip + clamp(target.grip - state.grip, -4.0 * dt, 4.0 * dt), 0, 1),
+    vx,
+    vy,
+    vz,
+  };
+  next.error = errorToTarget(next, target);
+  next.confidence = clamp(0.65 + (1 - next.error) * 0.28, 0.35, 0.98);
+  return next;
+}
+
+function buildHandJoints(frame) {
+  const joints = {
+    wrist: { x: 0, y: -0.35, z: 0 },
+    palm: { x: 0, y: 0, z: 0 },
+    palm_left: { x: -0.28, y: -0.02, z: 0 },
+    palm_right: { x: 0.28, y: -0.02, z: 0 },
+  };
+
+  FINGERS.forEach((finger) => {
+    let [x, y, z] = finger.base;
+    const curl = frame.grip * (finger.name === "thumb" ? 1.15 : 1);
+    const side = finger.spread;
+    const baseAngle = finger.angle;
+    finger.length.forEach((length, index) => {
+      const bend = curl * (0.45 + index * 0.34);
+      const dir = baseAngle + side * (1 - curl * 0.55);
+      x += Math.sin(dir) * length * (1 - curl * 0.2);
+      y += Math.cos(dir) * length * (1 - curl * 0.45);
+      z += Math.sin(bend) * (0.16 + index * 0.05);
+      joints[`${finger.name}_${index}`] = { x, y, z };
+    });
+  });
+  return joints;
+}
+
+function makeMaterial(color) {
+  return new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.06 });
 }
 
 function setBoneBetween(mesh, a, b) {
   const start = new THREE.Vector3(a.x, a.y, a.z);
   const end = new THREE.Vector3(b.x, b.y, b.z);
-  const midpoint = start.clone().add(end).multiplyScalar(0.5);
   const length = start.distanceTo(end);
-
-  mesh.position.copy(midpoint);
+  mesh.position.copy(start.clone().add(end).multiplyScalar(0.5));
   mesh.scale.set(1, Math.max(length, 0.001), 1);
   mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), end.clone().sub(start).normalize());
 }
 
-function predictJoints(controls, elapsed) {
-  const phase = (controls.phase + elapsed * controls.speed * 0.92) % 1;
-  const wave = phase * Math.PI * 2;
-  const swing = Math.sin(wave);
-  const counter = Math.sin(wave + Math.PI);
-  const lift = Math.abs(Math.cos(wave)) * 0.06 * controls.speed;
-  const yaw = controls.turn * 0.45;
-  const stride = controls.stride;
-  const x = elapsed * controls.speed * 0.35;
-  const zTurn = Math.sin(elapsed * controls.speed * 0.55) * controls.turn * 0.22;
-
-  return {
-    root: { x, y: lift, z: zTurn, ry: yaw },
-    pelvis: { x, y: 0.92 + lift, z: zTurn, rx: 0.08 * swing, ry: yaw * 0.4 },
-    spine_0: { x, y: 1.23 + lift, z: zTurn, rx: -0.06 * swing, ry: yaw * 0.25 },
-    spine_1: { x, y: 1.55 + lift, z: zTurn, rx: -0.08 * swing, ry: yaw * 0.2 },
-    neck: { x, y: 1.9 + lift, z: zTurn, rx: 0.03 * counter, ry: yaw * 0.15 },
-    head: { x, y: 2.18 + lift, z: zTurn, rx: 0.02 * counter, ry: yaw * 0.1 },
-    left_shoulder: { x: x - 0.34, y: 1.64 + lift, z: zTurn, rx: swing * controls.armDrive * 0.8, ry: yaw },
-    left_elbow: { x: x - 0.53, y: 1.28 + lift - Math.max(0, swing) * 0.1, z: zTurn + swing * 0.18, rx: swing * controls.armDrive * 0.55 + 0.45 },
-    left_wrist: { x: x - 0.6, y: 0.94 + lift - Math.max(0, swing) * 0.12, z: zTurn + swing * 0.27, rx: swing * controls.armDrive * 0.35 },
-    right_shoulder: { x: x + 0.34, y: 1.64 + lift, z: zTurn, rx: counter * controls.armDrive * 0.8, ry: yaw },
-    right_elbow: { x: x + 0.53, y: 1.28 + lift - Math.max(0, counter) * 0.1, z: zTurn + counter * 0.18, rx: counter * controls.armDrive * 0.55 + 0.45 },
-    right_wrist: { x: x + 0.6, y: 0.94 + lift - Math.max(0, counter) * 0.12, z: zTurn + counter * 0.27, rx: counter * controls.armDrive * 0.35 },
-    left_hip: { x: x - 0.18, y: 0.88 + lift, z: zTurn, rx: counter * controls.legDrive * stride * 0.75, ry: yaw * 0.3 },
-    left_knee: { x: x - 0.22, y: 0.48 + Math.max(0, -counter) * 0.12, z: zTurn + counter * stride * 0.24, rx: Math.abs(counter) * controls.legDrive * stride * 0.95 },
-    left_ankle: { x: x - 0.28 - counter * stride * 0.3, y: 0.07, z: zTurn + counter * stride * 0.32, rx: -Math.abs(counter) * 0.45 },
-    right_hip: { x: x + 0.18, y: 0.88 + lift, z: zTurn, rx: swing * controls.legDrive * stride * 0.75, ry: yaw * 0.3 },
-    right_knee: { x: x + 0.22, y: 0.48 + Math.max(0, -swing) * 0.12, z: zTurn + swing * stride * 0.24, rx: Math.abs(swing) * controls.legDrive * stride * 0.95 },
-    right_ankle: { x: x + 0.28 - swing * stride * 0.3, y: 0.07, z: zTurn + swing * stride * 0.32, rx: -Math.abs(swing) * 0.45 },
-    center_mass: { x, y: 1.2 + lift, z: zTurn, ry: yaw },
-  };
-}
-
-function createRig(scene) {
+function createHandRig(scene) {
   const rig = new THREE.Group();
   const jointMeshes = {};
-  const boneMeshes = [];
-  const accentJoints = new Set(["left_wrist", "right_wrist", "left_ankle", "right_ankle", "center_mass"]);
+  const bones = [];
+  const jointNames = ["wrist", "palm", "palm_left", "palm_right"];
+  FINGERS.forEach((finger) => finger.length.forEach((_, index) => jointNames.push(`${finger.name}_${index}`)));
 
-  JOINTS.forEach((joint) => {
-    const color = accentJoints.has(joint) ? 0xf59e0b : joint.startsWith("left") || joint.startsWith("right") ? 0x14b8a6 : 0xe6edf5;
-    const radius = joint === "head" ? 0.16 : joint === "center_mass" ? 0.055 : 0.07;
+  jointNames.forEach((name) => {
+    const radius = name === "palm" ? 0.075 : name === "wrist" ? 0.065 : 0.045;
+    const color = name.includes("thumb") ? 0xf59e0b : name.includes("palm") ? 0x93c5fd : 0x14b8a6;
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 24, 16), makeMaterial(color));
     mesh.castShadow = true;
-    jointMeshes[joint] = mesh;
+    jointMeshes[name] = mesh;
     rig.add(mesh);
   });
 
-  BONES.forEach(([from, to]) => {
-    const mesh = makeBoneMesh(from.includes("hip") || to.includes("ankle") ? 0xf59e0b : 0x93c5fd);
-    boneMeshes.push({ from, to, mesh });
+  const bonePairs = [
+    ["wrist", "palm"],
+    ["palm_left", "palm"],
+    ["palm", "palm_right"],
+  ];
+  FINGERS.forEach((finger) => {
+    bonePairs.push(["palm", `${finger.name}_0`]);
+    bonePairs.push([`${finger.name}_0`, `${finger.name}_1`]);
+    bonePairs.push([`${finger.name}_1`, `${finger.name}_2`]);
+  });
+
+  bonePairs.forEach(([from, to]) => {
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1, 12), makeMaterial(0xd8e2ef));
+    mesh.castShadow = true;
+    bones.push({ from, to, mesh });
     rig.add(mesh);
   });
 
-  const floor = new THREE.Mesh(
-    new THREE.PlaneGeometry(10, 5),
-    new THREE.MeshStandardMaterial({ color: 0x111923, roughness: 0.8 })
-  );
-  floor.rotation.x = -Math.PI / 2;
-  floor.receiveShadow = true;
-  scene.add(floor);
+  rig.rotation.x = -0.35;
   scene.add(rig);
-
-  return { rig, jointMeshes, boneMeshes };
+  return { rig, jointMeshes, bones };
 }
 
-function applyMotion(parts, controls, elapsed) {
-  const joints = predictJoints(controls, elapsed);
-  const rootOffset = joints.root.x;
-
-  JOINTS.forEach((joint) => {
-    const pose = joints[joint];
-    parts.jointMeshes[joint].position.set(pose.x - rootOffset, pose.y, pose.z);
-    parts.jointMeshes[joint].rotation.set(pose.rx || 0, pose.ry || 0, pose.rz || 0);
+function applyHandFrame(parts, frame) {
+  const joints = buildHandJoints(frame);
+  parts.rig.position.set(frame.x * 1.8, frame.y * 1.8, frame.z * 1.8);
+  parts.rig.rotation.set(-0.35 + frame.pitch, frame.yaw, frame.roll);
+  Object.entries(joints).forEach(([name, pose]) => {
+    parts.jointMeshes[name].position.set(pose.x, pose.y, pose.z);
   });
-
-  parts.boneMeshes.forEach(({ from, to, mesh }) => {
-    const a = joints[from];
-    const b = joints[to];
-    setBoneBetween(mesh, { ...a, x: a.x - rootOffset }, { ...b, x: b.x - rootOffset });
-  });
-  parts.rig.rotation.y = joints.root.ry;
+  parts.bones.forEach(({ from, to, mesh }) => setBoneBetween(mesh, joints[from], joints[to]));
 }
 
 function App() {
   const mountRef = useRef(null);
-  const controlsRef = useRef({ speed: 1, phase: 0, armDrive: 1, legDrive: 1, stride: 1, turn: 0 });
-  const [controls, setControls] = useState(controlsRef.current);
+  const keyframes = useMemo(() => parseCsv(KEYFRAME_CSV), []);
+  const frameRef = useRef(initialState(keyframes[0]));
+  const [frame, setFrame] = useState(frameRef.current);
   const [running, setRunning] = useState(true);
   const [renderError, setRenderError] = useState("");
-  const timeline = useMemo(() => {
-    const ioMs = 300;
-    const renderMs = 16;
-    return {
-      anchors: [0, ioMs, ioMs * 2, ioMs * 3],
-      predictedFrames: Math.floor(ioMs / renderMs),
-    };
-  }, []);
+
+  useEffect(() => {
+    if (!running) {
+      return undefined;
+    }
+    const timer = window.setInterval(() => {
+      const current = frameRef.current;
+      const anchorStep = Math.floor(current.frame_t_ms / ANCHOR_MS);
+      const targetIndex = (anchorStep % (keyframes.length - 1)) + 1;
+      const anchorLoop = Math.floor(anchorStep / (keyframes.length - 1)) + 1;
+      const target = keyframes[targetIndex];
+      let next = stepPredictor({ ...current, targetIndex, anchorLoop }, target);
+      next.targetIndex = targetIndex;
+      next.csvLine = targetIndex + 1;
+      next.anchorLoop = anchorLoop;
+      if (next.frame_t_ms > keyframes[keyframes.length - 1].t_ms && targetIndex === keyframes.length - 1 && next.error < target.tolerance) {
+        next = initialState(keyframes[0]);
+        next.anchorLoop = anchorLoop + 1;
+      }
+      frameRef.current = next;
+      setFrame(next);
+    }, RENDER_MS);
+    return () => window.clearInterval(timer);
+  }, [keyframes, running]);
 
   useEffect(() => {
     const mount = mountRef.current;
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
     let renderer;
-    const clock = new THREE.Clock();
     let frameId = 0;
 
     try {
@@ -185,20 +259,24 @@ function App() {
     }
 
     scene.background = new THREE.Color(0x0b0f14);
-    camera.position.set(0, 1.6, 4.4);
-    camera.lookAt(0, 1.25, 0);
+    camera.position.set(0, 0.25, 2.35);
+    camera.lookAt(0, 0.08, 0);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     mount.appendChild(renderer.domElement);
 
-    const hemi = new THREE.HemisphereLight(0xb7d7ff, 0x1d2530, 1.7);
-    const key = new THREE.DirectionalLight(0xffffff, 2.2);
-    key.position.set(3, 5, 4);
+    const hemi = new THREE.HemisphereLight(0xb7d7ff, 0x111923, 1.7);
+    const key = new THREE.DirectionalLight(0xffffff, 2.4);
+    key.position.set(2.5, 4, 2);
     key.castShadow = true;
     scene.add(hemi, key);
 
-    const parts = createRig(scene);
+    const grid = new THREE.GridHelper(2.4, 12, 0x2f3a48, 0x202a36);
+    grid.rotation.x = Math.PI / 2;
+    grid.position.z = -0.22;
+    scene.add(grid);
 
+    const parts = createHandRig(scene);
     const resize = () => {
       const width = mount.clientWidth;
       const height = mount.clientHeight;
@@ -206,10 +284,8 @@ function App() {
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
     };
-
     const animate = () => {
-      const elapsed = running ? clock.getElapsedTime() : 0;
-      applyMotion(parts, controlsRef.current, elapsed);
+      applyHandFrame(parts, frameRef.current);
       renderer.render(scene, camera);
       frameId = requestAnimationFrame(animate);
     };
@@ -217,40 +293,52 @@ function App() {
     resize();
     animate();
     window.addEventListener("resize", resize);
-
     return () => {
       cancelAnimationFrame(frameId);
       window.removeEventListener("resize", resize);
       renderer.dispose();
       mount.removeChild(renderer.domElement);
     };
-  }, [running]);
+  }, []);
 
-  function updateControl(key, value) {
-    const next = { ...controlsRef.current, [key]: Number(value) };
-    controlsRef.current = next;
-    setControls(next);
+  function resetDemo() {
+    frameRef.current = initialState(keyframes[0]);
+    setFrame(frameRef.current);
   }
 
-  function resetControls() {
-    const next = { speed: 1, phase: 0, armDrive: 1, legDrive: 1, stride: 1, turn: 0 };
-    controlsRef.current = next;
-    setControls(next);
-  }
+  const target = keyframes[frame.targetIndex] || keyframes[0];
+  const predictedGap = Math.floor(ANCHOR_MS / RENDER_MS);
+  const csvRows = KEYFRAME_CSV.trim().split(/\r?\n/);
+  const liveRows = [
+    ["frame_t_ms", frame.frame_t_ms],
+    ["target", target.frame_id],
+    ["palm_x", frame.x.toFixed(4)],
+    ["palm_y", frame.y.toFixed(4)],
+    ["palm_z", frame.z.toFixed(4)],
+    ["yaw", frame.yaw.toFixed(3)],
+    ["pitch", frame.pitch.toFixed(3)],
+    ["roll", frame.roll.toFixed(3)],
+    ["grip", frame.grip.toFixed(3)],
+    ["vx", frame.vx.toFixed(3)],
+    ["vy", frame.vy.toFixed(3)],
+    ["vz", frame.vz.toFixed(3)],
+    ["error", frame.error.toFixed(4)],
+    ["confidence", frame.confidence.toFixed(3)],
+  ];
 
   return (
     <main className="app-shell">
       <section className="hero">
         <div>
-          <p>300ms IO anchors / 16ms joint prediction</p>
-          <h1>Dephy Motion Rig</h1>
+          <p>single palm keyframes / 300ms device anchors / 16ms predicted frames</p>
+          <h1>Hand Prediction Demo</h1>
         </div>
         <div className="hero-actions">
           <button type="button" onClick={() => setRunning(!running)} title={running ? "Pause" : "Play"}>
             {running ? <Pause size={18} /> : <Play size={18} />}
             <span>{running ? "Pause" : "Play"}</span>
           </button>
-          <button type="button" onClick={resetControls} title="Reset controls">
+          <button type="button" onClick={resetDemo} title="Reset demo">
             <RotateCcw size={18} />
             <span>Reset</span>
           </button>
@@ -261,42 +349,52 @@ function App() {
         <div className="stage" ref={mountRef} />
         {renderError ? <div className="render-error">{renderError}</div> : null}
         <aside className="control-panel">
-          {[
-            ["speed", "Speed", 0, 3, 0.05],
-            ["phase", "Phase", 0, 1, 0.01],
-            ["armDrive", "Arm", 0, 1.8, 0.05],
-            ["legDrive", "Leg", 0, 1.8, 0.05],
-            ["stride", "Stride", 0.2, 2, 0.05],
-            ["turn", "Turn", -1, 1, 0.05],
-          ].map(([key, label, min, max, step]) => (
-            <label key={key}>
-              <span>{label}</span>
-              <input type="range" min={min} max={max} step={step} value={controls[key]} onChange={(event) => updateControl(key, event.target.value)} />
-              <strong>{controls[key].toFixed(2)}</strong>
-            </label>
-          ))}
-
-          <div className="timeline">
-            <div className="timeline-head">
-              <span>IO sample</span>
-              <strong>300ms</strong>
+          <div className="status-strip">
+            <div>
+              <span>simul</span>
+              <strong>{ANCHOR_MS}ms</strong>
             </div>
-            <div className="ticks">
-              {timeline.anchors.map((tick) => (
-                <span key={tick}>{tick}</span>
-              ))}
+            <div>
+              <span>implement</span>
+              <strong>{RENDER_MS}ms</strong>
             </div>
-            <div className="timeline-head">
-              <span>Predicted frames</span>
-              <strong>{timeline.predictedFrames}/gap</strong>
+            <div>
+              <span>fill</span>
+              <strong>{predictedGap}/gap</strong>
             </div>
           </div>
 
-          <div className="mapping">
-            <code>slot1:di:1:1 run gate</code>
-            <code>slot2:ai:1:80 speed target</code>
-            <code>slot3:ai:2:65 stride</code>
-            <code>slot4:relay:1:0 motion lock</code>
+          <div className="timeline">
+            <div className="timeline-head">
+              <span>keyframe script</span>
+              <strong>loop {frame.anchorLoop}</strong>
+            </div>
+            <div className="keyframe-list">
+              {keyframes.map((item, index) => (
+                <div className={index === frame.targetIndex ? "keyframe active" : "keyframe"} key={item.frame_id}>
+                  <span>{item.t_ms}</span>
+                  <strong>{item.frame_id}</strong>
+                  <em>{item.grip.toFixed(2)}</em>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="live-grid">
+            {liveRows.map(([label, value]) => (
+              <div key={label}>
+                <span>{label}</span>
+                <strong>{value}</strong>
+              </div>
+            ))}
+          </div>
+
+          <div className="csv-panel">
+            <div className="timeline-head">
+              <span>csv anchor stream</span>
+              <strong>line {frame.csvLine}</strong>
+            </div>
+            <pre>{csvRows.slice(0, 1).concat(csvRows.slice(Math.max(1, frame.csvLine - 1), frame.csvLine + 2)).join("\n")}</pre>
           </div>
         </aside>
       </section>

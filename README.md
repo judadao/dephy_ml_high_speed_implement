@@ -94,6 +94,24 @@ The current policy artifact is a small gain-based controller trained in the
 offline environment. Unsafe or missing policies fall back to the deterministic
 bounded predictor.
 
+## Web Hand Demo
+
+The Vite web demo visualizes the single-palm scope. The left side renders hand
+joint points and bones. The right side shows a CSV keyframe stream that behaves
+like a simulator sending one anchor every 300ms, while the implement side
+generates 16ms predicted frames between anchors.
+
+```sh
+make -f Makefile.linux web-install
+make -f Makefile.linux web
+```
+
+Then open `http://127.0.0.1:8091/`.
+
+The demo is browser-side only: it uses embedded CSV keyframes to simulate the
+device loop, then applies the same bounded prediction idea to update palm
+position, rotation, grip, error, confidence, and target keyframe data live.
+
 ## Generate Frames
 
 ```sh
