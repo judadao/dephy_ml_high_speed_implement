@@ -1,31 +1,31 @@
 items:
   - id: hand_scope_readme
     title: Document single-palm keyframe prediction scope
-    status: open
+    status: done
   - id: hand_keyframe_schema
     title: Define hand keyframe and runtime state data
-    status: open
+    status: done
   - id: hand_deterministic_predictor
     title: Add deterministic hand predictor fallback
-    status: open
+    status: done
   - id: hand_keyframe_runner
     title: Add keyframe runner and predicted frame output
-    status: open
+    status: done
   - id: hand_rl_environment
     title: Add offline reinforcement learning environment
-    status: open
+    status: done
   - id: hand_rl_policy_export
     title: Train and export small hand control policy
-    status: open
+    status: done
   - id: hand_c_policy_inference
     title: Load policy in C predictor with safety fallback
-    status: open
+    status: done
   - id: hand_scenarios_tests
     title: Add hand scenarios and integration tests
-    status: open
+    status: done
   - id: full_body_3d_deferred
     title: Defer full-body and 3D integration for this phase
-    status: open
+    status: done
   - id: ml_hsi_io_device_stream_consumer
     title: Consume linux_io_device_simul slot stream output
     status: done

@@ -7,21 +7,21 @@ The previous full-body/3D rig work is retained as background, but the next
 deliverable is a hand-palm predictor that can make low-rate keyframes behave
 like high-rate data on weak/old hardware.
 
-- [ ] Document the single-palm scope in README: old hardware, low-rate IO/keyframes, high-rate predicted frames.
-- [ ] Define hand keyframe data: palm position, rotation, grip, hold time, tolerance, and safety flags.
-- [ ] Define runtime hand state: current pose, velocity, acceleration, target frame, error, confidence.
-- [ ] Add deterministic hand predictor fallback with velocity/acceleration limits and overshoot prevention.
-- [ ] Add keyframe runner that advances to the next keyframe only after tolerance is reached.
-- [ ] Add CSV/JSONL output for predicted hand frames.
-- [ ] Add offline reinforcement-learning environment for single-palm control.
-- [ ] Define RL observation vector: current pose, target pose, error, velocity, last action, time budget, safety hold.
-- [ ] Define RL action vector: delta position, delta rotation, delta grip, and speed scale.
-- [ ] Define RL reward: target progress, smoothness, completion bonus, overshoot penalty, limit/safety penalty.
-- [ ] Add trainer that exports a small policy artifact usable by C inference.
-- [ ] Add C policy inference path with deterministic fallback when policy is missing or unsafe.
-- [ ] Add scenarios: straight move, grip close, turn and move, slow IO fast prediction, overshoot recovery, safety hold.
-- [ ] Add tests for target reach, keyframe transition, safety hold, overshoot recovery, policy loading, and CLI output.
-- [ ] Mark full-body 3D and 55-joint work as deferred for this phase.
+- [x] Document the single-palm scope in README: old hardware, low-rate IO/keyframes, high-rate predicted frames.
+- [x] Define hand keyframe data: palm position, rotation, grip, hold time, tolerance, and safety flags.
+- [x] Define runtime hand state: current pose, velocity, acceleration, target frame, error, confidence.
+- [x] Add deterministic hand predictor fallback with velocity/acceleration limits and overshoot prevention.
+- [x] Add keyframe runner that advances to the next keyframe only after tolerance is reached.
+- [x] Add CSV output for predicted hand frames.
+- [x] Add offline reinforcement-learning environment for single-palm control.
+- [x] Define RL observation vector: current pose, target pose, error, velocity, last action, time budget, safety hold.
+- [x] Define RL action vector: delta position, delta rotation, delta grip, and speed scale.
+- [x] Define RL reward: target progress, smoothness, completion bonus, overshoot penalty, limit/safety penalty.
+- [x] Add trainer that exports a small policy artifact usable by C inference.
+- [x] Add C policy inference path with deterministic fallback when policy is missing or unsafe.
+- [x] Add scenarios: straight move, grip close, turn and move, slow IO fast prediction, overshoot recovery, safety hold.
+- [x] Add tests for target reach, keyframe transition, safety hold, policy loading, and CLI output.
+- [x] Mark full-body 3D and 55-joint work as deferred for this phase.
 
 ## Completed Background Work
 

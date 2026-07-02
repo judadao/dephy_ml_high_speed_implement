@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dephy.local/schemas/hand_policy.schema.json",
+  "title": "Dephy Single Palm Policy",
+  "type": "object",
+  "required": ["format", "kp_pos", "kd_pos", "kp_rot", "kp_grip", "speed_scale"],
+  "properties": {
+    "format": { "type": "string", "const": "dephy_hand_policy_v1" },
+    "kp_pos": { "type": "number", "exclusiveMinimum": 0 },
+    "kd_pos": { "type": "number", "minimum": 0 },
+    "kp_rot": { "type": "number", "exclusiveMinimum": 0 },
+    "kp_grip": { "type": "number", "exclusiveMinimum": 0 },
+    "speed_scale": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+    "training": { "type": "object" }
+  }
+}

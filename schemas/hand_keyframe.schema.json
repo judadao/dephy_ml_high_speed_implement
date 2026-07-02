@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dephy.local/schemas/hand_keyframe.schema.json",
+  "title": "Dephy Single Palm Keyframe",
+  "type": "object",
+  "required": ["frame_id", "t_ms", "palm", "rotation", "grip", "tolerance"],
+  "properties": {
+    "frame_id": { "type": "string" },
+    "t_ms": { "type": "integer", "minimum": 0 },
+    "palm": {
+      "type": "object",
+      "required": ["x", "y", "z"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" }
+      }
+    },
+    "rotation": {
+      "type": "object",
+      "required": ["yaw", "pitch", "roll"],
+      "properties": {
+        "yaw": { "type": "number" },
+        "pitch": { "type": "number" },
+        "roll": { "type": "number" }
+      }
+    },
+    "grip": { "type": "number", "minimum": 0, "maximum": 1 },
+    "hold_ms": { "type": "integer", "minimum": 0 },
+    "tolerance": { "type": "number", "exclusiveMinimum": 0 },
+    "safety_hold": { "type": "boolean" }
+  }
+}

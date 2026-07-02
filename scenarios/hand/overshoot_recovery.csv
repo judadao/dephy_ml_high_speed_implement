@@ -1,0 +1,4 @@
+frame_id,t_ms,x,y,z,yaw,pitch,roll,grip,hold_ms,tolerance,safety_hold
+start,0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0,0.01,0
+far_fast,300,0.75,0.0,0.0,0.0,0.0,0.0,0.0,32,0.012,0
+return_precise,600,0.25,0.0,0.0,0.0,0.0,0.0,0.0,64,0.010,0

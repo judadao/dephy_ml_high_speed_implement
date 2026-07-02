@@ -21,3 +21,19 @@ hold_out="${OUTDIR:-build_out}/hand_hold.csv"
     --keyframes scenarios/hand/safety_hold.csv \
     --render-ms 16 > "$hold_out"
 tail -n 1 "$hold_out" | awk -F, '{ if ($3 != "0.00000") exit 1; if ($14 != "1.000") exit 1; }'
+
+slow_out="${OUTDIR:-build_out}/hand_slow_io.csv"
+"${OUTDIR:-build_out}/dephy_hand_predict" \
+    --keyframes scenarios/hand/slow_io_fast_prediction.csv \
+    --render-ms 16 > "$slow_out"
+grep -q ',anchor_900,' "$slow_out"
+tail -n 1 "$slow_out" | awk -F, '{ if ($15 != "1") exit 1; if ($13 > 0.02) exit 1; }'
+
+recovery_out="${OUTDIR:-build_out}/hand_overshoot_recovery.csv"
+"${OUTDIR:-build_out}/dephy_hand_predict" \
+    --keyframes scenarios/hand/overshoot_recovery.csv \
+    --render-ms 16 \
+    --max-speed 2.0 \
+    --max-accel 8.0 > "$recovery_out"
+grep -q ',return_precise,' "$recovery_out"
+tail -n 1 "$recovery_out" | awk -F, '{ if ($15 != "1") exit 1; if ($3 < 0.24 || $3 > 0.26) exit 1; }'

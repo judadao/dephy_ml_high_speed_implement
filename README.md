@@ -49,10 +49,50 @@ or IO updates provide reality checks, while the local predictor fills the gap.
 ```sh
 make -f Makefile.linux
 make -f Makefile.linux test
+make -f Makefile.linux hand-rl-check
 make -f Makefile.linux demo
 make -f Makefile.linux web-install
 make -f Makefile.linux web
 ```
+
+## Single Palm Keyframe Prediction
+
+Run deterministic bounded prediction:
+
+```sh
+build_out/dephy_hand_predict \
+  --keyframes scenarios/hand/slow_io_fast_prediction.csv \
+  --render-ms 16 > build_out/hand_frames.csv
+```
+
+Train a small dependency-free RL policy:
+
+```sh
+python3 scripts/train_hand_policy.py \
+  --scenario scenarios/hand/straight_move.csv \
+  --scenario scenarios/hand/grip_close.csv \
+  --scenario scenarios/hand/turn_and_move.csv \
+  --out build_out/hand_policy.json
+```
+
+Run the C predictor with the exported policy:
+
+```sh
+build_out/dephy_hand_predict \
+  --keyframes scenarios/hand/turn_and_move.csv \
+  --policy build_out/hand_policy.json \
+  --render-ms 16 > build_out/hand_policy_frames.csv
+```
+
+CSV output:
+
+```txt
+frame_t_ms,target_frame,palm_x,palm_y,palm_z,yaw,pitch,roll,grip,vx,vy,vz,error,confidence,reached
+```
+
+The current policy artifact is a small gain-based controller trained in the
+offline environment. Unsafe or missing policies fall back to the deterministic
+bounded predictor.
 
 ## Generate Frames
 

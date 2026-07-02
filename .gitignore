@@ -4,4 +4,5 @@ build_out/
 out/
 web/node_modules/
 web/dist/
-
+__pycache__/
+*.pyc
