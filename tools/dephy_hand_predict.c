@@ -45,8 +45,86 @@ static int parse_f32(const char *text, float *out)
 static void usage(const char *argv0)
 {
     fprintf(stderr,
-            "usage: %s --keyframes FILE [--render-ms 16] [--max-speed N] [--max-accel N]\n",
+            "usage: %s --keyframes FILE [--policy FILE] [--render-ms 16] [--max-speed N] [--max-accel N]\n",
             argv0);
+}
+
+static int read_file_text(const char *path, char *out, size_t out_size)
+{
+    FILE *fp;
+    size_t count;
+
+    if (!path || !out || out_size == 0) {
+        return -1;
+    }
+
+    fp = fopen(path, "rb");
+    if (!fp) {
+        perror(path);
+        return -1;
+    }
+    count = fread(out, 1, out_size - 1, fp);
+    out[count] = '\0';
+    fclose(fp);
+    return 0;
+}
+
+static int json_find_f32(const char *json, const char *key, float *out)
+{
+    char pattern[64];
+    const char *pos;
+    char *end = 0;
+
+    if (!json || !key || !out) {
+        return -1;
+    }
+    if (snprintf(pattern, sizeof(pattern), "\"%s\":", key) >= (int)sizeof(pattern)) {
+        return -1;
+    }
+    pos = strstr(json, pattern);
+    if (!pos) {
+        return -1;
+    }
+    pos += strlen(pattern);
+    errno = 0;
+    *out = strtof(pos, &end);
+    if (errno != 0 || end == pos) {
+        return -1;
+    }
+    return 0;
+}
+
+static int load_policy_config(const char *path, dephy_hand_predictor_config_t *config)
+{
+    char json[8192];
+    float value;
+
+    if (!path || !config || read_file_text(path, json, sizeof(json)) != 0) {
+        return -1;
+    }
+    if (!strstr(json, "\"format\": \"dephy_hand_policy_v1\"") &&
+        !strstr(json, "\"format\":\"dephy_hand_policy_v1\"")) {
+        return -1;
+    }
+
+    if (json_find_f32(json, "kp_pos", &value) == 0 && value > 0.0f && value < 100.0f) {
+        config->kp_pos = value;
+    }
+    if (json_find_f32(json, "kd_pos", &value) == 0 && value >= 0.0f && value < 100.0f) {
+        config->kd_pos = value;
+    }
+    if (json_find_f32(json, "kp_rot", &value) == 0 && value > 0.0f && value < 100.0f) {
+        config->kp_rot = value;
+    }
+    if (json_find_f32(json, "kp_grip", &value) == 0 && value > 0.0f && value < 100.0f) {
+        config->kp_grip = value;
+    }
+    if (json_find_f32(json, "speed_scale", &value) == 0 && value > 0.0f && value <= 1.0f) {
+        config->max_speed *= value;
+        config->max_rot_speed *= value;
+        config->max_grip_speed *= value;
+    }
+    return 0;
 }
 
 static int parse_keyframe_line(char *line, dephy_hand_keyframe_t *keyframe)
@@ -150,6 +228,7 @@ int main(int argc, char **argv)
     dephy_hand_keyframe_t keyframes[DEPHY_HAND_MAX_KEYFRAMES];
     dephy_hand_state_t state;
     const char *keyframe_path = 0;
+    const char *policy_path = 0;
     size_t keyframe_count = 0;
     size_t target_index;
     int i;
@@ -157,6 +236,8 @@ int main(int argc, char **argv)
     for (i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--keyframes") == 0 && i + 1 < argc) {
             keyframe_path = argv[++i];
+        } else if (strcmp(argv[i], "--policy") == 0 && i + 1 < argc) {
+            policy_path = argv[++i];
         } else if (strcmp(argv[i], "--render-ms") == 0 && i + 1 < argc) {
             if (parse_u32(argv[++i], &config.render_period_ms) != 0 || config.render_period_ms == 0) {
                 usage(argv[0]);
@@ -181,6 +262,9 @@ int main(int argc, char **argv)
     if (!keyframe_path || load_keyframes(keyframe_path, keyframes, &keyframe_count) != 0) {
         usage(argv[0]);
         return 2;
+    }
+    if (policy_path && load_policy_config(policy_path, &config) != 0) {
+        fprintf(stderr, "invalid hand policy, using deterministic fallback: %s\n", policy_path);
     }
 
     state = dephy_hand_state_from_keyframe(&keyframes[0]);
