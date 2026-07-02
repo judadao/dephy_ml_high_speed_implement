@@ -18,38 +18,38 @@ export const FINGERS = [
 const CAN_GRASP_JOINT_TARGETS = {
   thumb: [
     [-0.28, -0.035, 0.07],
-    [-0.21, 0.025, 0.12],
-    [-0.13, 0.075, 0.16],
-    [-0.055, 0.115, 0.18],
-    [0.01, 0.135, 0.175],
+    [-0.22, 0.025, 0.105],
+    [-0.155, 0.075, 0.13],
+    [-0.09, 0.115, 0.14],
+    [-0.035, 0.145, 0.13],
   ],
   index: [
     [-0.145, 0.255, 0.065],
-    [-0.13, 0.335, 0.13],
-    [-0.105, 0.245, 0.225],
-    [-0.078, 0.135, 0.255],
-    [-0.055, 0.055, 0.215],
+    [-0.135, 0.325, 0.125],
+    [-0.115, 0.305, 0.175],
+    [-0.095, 0.265, 0.19],
+    [-0.075, 0.23, 0.175],
   ],
   middle: [
     [0.0, 0.275, 0.065],
-    [0.0, 0.355, 0.135],
-    [0.0, 0.255, 0.235],
-    [0.0, 0.14, 0.265],
-    [0.0, 0.055, 0.225],
+    [0.0, 0.345, 0.13],
+    [0.0, 0.325, 0.185],
+    [0.0, 0.28, 0.2],
+    [0.0, 0.24, 0.185],
   ],
   ring: [
     [0.135, 0.255, 0.065],
-    [0.118, 0.335, 0.13],
-    [0.092, 0.245, 0.225],
-    [0.066, 0.135, 0.255],
-    [0.045, 0.055, 0.215],
+    [0.118, 0.325, 0.125],
+    [0.096, 0.305, 0.175],
+    [0.073, 0.265, 0.19],
+    [0.052, 0.23, 0.175],
   ],
   pinky: [
     [0.245, 0.205, 0.06],
-    [0.215, 0.275, 0.12],
-    [0.175, 0.205, 0.205],
-    [0.135, 0.115, 0.235],
-    [0.105, 0.045, 0.195],
+    [0.215, 0.27, 0.115],
+    [0.178, 0.255, 0.165],
+    [0.142, 0.22, 0.18],
+    [0.112, 0.19, 0.165],
   ],
 };
 
@@ -104,6 +104,7 @@ export function buildHandJoints(frame) {
     });
   });
   keepFingerJointsOutsideCan(joints, frame);
+  keepFingersOnPartialCanWrap(joints, frame);
   return joints;
 }
 
@@ -125,8 +126,6 @@ function keepFingerJointsOutsideCan(joints, frame) {
   const can = canInHandSpace(frame);
   const approachGuard = 0.16 * smoothstep((0.74 - can.center.length()) / 0.3);
 
-  keepPalmOutsideCan(joints, can);
-
   for (let pass = 0; pass < 3; pass += 1) {
     FINGERS.flatMap((finger) =>
       FINGER_JOINTS.map((joint, index) => ({
@@ -145,29 +144,6 @@ function keepFingerJointsOutsideCan(joints, frame) {
       pose.x += correction.vector.x * collisionStrength;
       pose.y += correction.vector.y * collisionStrength;
       pose.z += correction.vector.z * collisionStrength;
-    });
-  }
-}
-
-function keepPalmOutsideCan(joints, can) {
-  for (let pass = 0; pass < 8; pass += 1) {
-    let correction = null;
-    PALM_COLLISION_JOINTS.forEach((name) => {
-      const candidate = canCorrectionForPoint(joints[name], can, 0.09 / HAND_SCALE, new THREE.Vector3(-0.2, 0, 0.1).normalize());
-      if (!candidate) {
-        return;
-      }
-      if (!correction || candidate.depth > correction.depth) {
-        correction = candidate;
-      }
-    });
-    if (!correction) {
-      return;
-    }
-    Object.values(joints).forEach((pose) => {
-      pose.x += correction.vector.x;
-      pose.y += correction.vector.y;
-      pose.z += correction.vector.z;
     });
   }
 }
@@ -193,6 +169,53 @@ function canCorrectionForPoint(pose, can, clearance, fallback) {
     minimumDistance,
     vector: corrected.sub(point),
   };
+}
+
+function keepFingersOnPartialCanWrap(joints, frame) {
+  const close = smoothstep((frame.grip - 0.55) / 0.45);
+  if (close <= 0) {
+    return;
+  }
+  const can = canInHandSpace(frame);
+  const floors = {
+    index_dip: 0.22,
+    index_tip: 0.20,
+    middle_dip: 0.23,
+    middle_tip: 0.21,
+    ring_dip: 0.22,
+    ring_tip: 0.20,
+    pinky_dip: 0.17,
+    pinky_tip: 0.15,
+  };
+  Object.entries(floors).forEach(([name, floor]) => {
+    const pose = joints[name];
+    if (!pose || pose.y >= floor) {
+      return;
+    }
+    pose.y = frame.grip >= 0.75 ? floor : pose.y * (1 - close) + floor * close;
+    keepPointOutsideCanAtCurrentY(pose, can, 0.06 / HAND_SCALE);
+  });
+}
+
+function keepPointOutsideCanAtCurrentY(pose, can, clearance) {
+  const point = new THREE.Vector3(pose.x, pose.y, pose.z);
+  const offset = point.clone().sub(can.center);
+  const axialDistance = offset.dot(can.axis);
+  if (Math.abs(axialDistance) > can.halfHeight + 0.08) {
+    return;
+  }
+  const axial = can.axis.clone().multiplyScalar(axialDistance);
+  const radial = offset.sub(axial);
+  radial.y = 0;
+  const radialDistance = radial.length();
+  const minimumDistance = can.radius + clearance + 0.004;
+  if (radialDistance >= minimumDistance || radialDistance <= 0.001) {
+    return;
+  }
+  radial.normalize().multiplyScalar(minimumDistance);
+  const corrected = can.center.clone().add(axial).add(radial);
+  pose.x = corrected.x;
+  pose.z = corrected.z;
 }
 
 export function canClearanceMetrics(frame, joints = buildHandJoints(frame)) {

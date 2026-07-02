@@ -111,6 +111,7 @@ def grasp_can_keyframe(index: int, count: int, rng: random.Random) -> tuple[str,
         t = scaled - low
         name = f"{path[low][0]}_to_{path[high][0]}_{index:04d}"
         pose = [path[low][1][axis] + (path[high][1][axis] - path[low][1][axis]) * t for axis in range(7)]
+    pose = keep_grasp_palm_behind_can(pose)
     noisy = [
         pose[0] + rng.uniform(-0.01, 0.01),
         pose[1] + rng.uniform(-0.008, 0.008),
@@ -121,6 +122,22 @@ def grasp_can_keyframe(index: int, count: int, rng: random.Random) -> tuple[str,
         clamp(pose[6] + rng.uniform(-0.025, 0.025), 0.0, 1.0),
     ]
     return name, noisy
+
+
+def keep_grasp_palm_behind_can(pose: list[float]) -> list[float]:
+    """Keep palm keyframes behind the can so the web rig does not deform the palm."""
+    x, y, z, yaw, pitch, roll, grip = pose
+    near_can = y > 0.06 or roll < -0.45 or grip > 0.12
+    if not near_can:
+        return pose
+    closure = clamp((grip - 0.12) / 0.88, 0.0, 1.0)
+    rotation_close = clamp((-roll - 0.55) / 0.85, 0.0, 1.0)
+    behind = max(closure, rotation_close)
+    target_z = -0.14 - 0.05 * behind
+    pose[2] = min(z, target_z)
+    pose[0] = x - 0.04 * behind
+    pose[5] = roll + 0.12 * behind
+    return pose
 
 
 def main() -> int:
