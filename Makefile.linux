@@ -5,11 +5,11 @@ LDFLAGS ?= -lm
 OUTDIR  ?= build_out
 
 LIB := $(OUTDIR)/libdephy_ml_high_speed_implement.a
-OBJS := $(OUTDIR)/src/bitmap_anim.o $(OUTDIR)/src/joint_predictor.o
+OBJS := $(OUTDIR)/src/bitmap_anim.o $(OUTDIR)/src/joint_predictor.o $(OUTDIR)/src/hand_predictor.o
 
 .PHONY: all structure-audit direct-test test io-device-pipeline-check zephyr-metadata demo web-install web-build web web-render-check clean
 
-all: $(LIB) $(OUTDIR)/dephy_bitmap_anim $(OUTDIR)/dephy_joint_replay
+all: $(LIB) $(OUTDIR)/dephy_bitmap_anim $(OUTDIR)/dephy_joint_replay $(OUTDIR)/dephy_hand_predict
 
 $(OUTDIR):
 	mkdir -p $(OUTDIR)/src
@@ -18,6 +18,9 @@ $(OUTDIR)/src/bitmap_anim.o: src/bitmap_anim.c include/dephy_ml_high_speed_imple
 	$(CC) $(CFLAGS) -Iinclude -c $< -o $@
 
 $(OUTDIR)/src/joint_predictor.o: src/joint_predictor.c include/dephy_ml_high_speed_implement/joint_predictor.h | $(OUTDIR)
+	$(CC) $(CFLAGS) -Iinclude -c $< -o $@
+
+$(OUTDIR)/src/hand_predictor.o: src/hand_predictor.c include/dephy_ml_high_speed_implement/hand_predictor.h | $(OUTDIR)
 	$(CC) $(CFLAGS) -Iinclude -c $< -o $@
 
 $(LIB): $(OBJS)
@@ -29,11 +32,17 @@ $(OUTDIR)/unit_bitmap_anim: tests/unit_bitmap_anim.c src/bitmap_anim.c include/d
 $(OUTDIR)/unit_joint_predictor: tests/unit_joint_predictor.c src/joint_predictor.c include/dephy_ml_high_speed_implement/joint_predictor.h | $(OUTDIR)
 	$(CC) $(CFLAGS) -Iinclude tests/unit_joint_predictor.c src/joint_predictor.c $(LDFLAGS) -o $@
 
+$(OUTDIR)/unit_hand_predictor: tests/unit_hand_predictor.c src/hand_predictor.c include/dephy_ml_high_speed_implement/hand_predictor.h | $(OUTDIR)
+	$(CC) $(CFLAGS) -Iinclude tests/unit_hand_predictor.c src/hand_predictor.c $(LDFLAGS) -o $@
+
 $(OUTDIR)/dephy_bitmap_anim: tools/dephy_bitmap_anim.c src/bitmap_anim.c include/dephy_ml_high_speed_implement/bitmap_anim.h | $(OUTDIR)
 	$(CC) $(CFLAGS) -Iinclude tools/dephy_bitmap_anim.c src/bitmap_anim.c $(LDFLAGS) -o $@
 
 $(OUTDIR)/dephy_joint_replay: tools/dephy_joint_replay.c src/joint_predictor.c include/dephy_ml_high_speed_implement/joint_predictor.h | $(OUTDIR)
 	$(CC) $(CFLAGS) -Iinclude tools/dephy_joint_replay.c src/joint_predictor.c $(LDFLAGS) -o $@
+
+$(OUTDIR)/dephy_hand_predict: tools/dephy_hand_predict.c src/hand_predictor.c include/dephy_ml_high_speed_implement/hand_predictor.h | $(OUTDIR)
+	$(CC) $(CFLAGS) -Iinclude tools/dephy_hand_predict.c src/hand_predictor.c $(LDFLAGS) -o $@
 
 structure-audit:
 	./scripts/audit_module_structure.sh .
@@ -41,11 +50,13 @@ structure-audit:
 zephyr-metadata:
 	./scripts/test_zephyr_module.sh --metadata-only
 
-direct-test: $(OUTDIR)/unit_bitmap_anim $(OUTDIR)/unit_joint_predictor $(OUTDIR)/dephy_bitmap_anim $(OUTDIR)/dephy_joint_replay structure-audit zephyr-metadata
+direct-test: $(OUTDIR)/unit_bitmap_anim $(OUTDIR)/unit_joint_predictor $(OUTDIR)/unit_hand_predictor $(OUTDIR)/dephy_bitmap_anim $(OUTDIR)/dephy_joint_replay $(OUTDIR)/dephy_hand_predict structure-audit zephyr-metadata
 	$(OUTDIR)/unit_bitmap_anim
 	$(OUTDIR)/unit_joint_predictor
+	$(OUTDIR)/unit_hand_predictor
 	OUTDIR=$(OUTDIR) sh scripts/test_cli_generate.sh
 	OUTDIR=$(OUTDIR) sh scripts/test_joint_replay.sh
+	OUTDIR=$(OUTDIR) sh scripts/test_hand_predict.sh
 
 test: direct-test
 
