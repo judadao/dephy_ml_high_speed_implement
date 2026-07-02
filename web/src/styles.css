@@ -173,6 +173,59 @@ button {
   white-space: nowrap;
 }
 
+.playback-panel {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #263241;
+  border-radius: 7px;
+  background: var(--panel-2);
+}
+
+.mode-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.mode-toggle button {
+  min-height: 32px;
+  justify-content: center;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mode-toggle button.active {
+  border-color: var(--teal);
+  background: #102028;
+  color: #8ff4e7;
+}
+
+.keyframe-picker {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 34px;
+  gap: 6px;
+}
+
+.keyframe-picker button {
+  min-height: 34px;
+  justify-content: center;
+  padding: 0;
+}
+
+.keyframe-picker select {
+  min-width: 0;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 0 10px;
+  background: #0b1118;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+}
+
 .status-strip div,
 .live-grid div,
 .policy-grid div {
@@ -254,6 +307,12 @@ button {
   border: 1px solid #263241;
   border-radius: 7px;
   background: #0b1118;
+}
+
+button.keyframe {
+  width: 100%;
+  min-height: 0;
+  text-align: left;
 }
 
 .keyframe.active {

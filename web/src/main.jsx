@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { ChevronDown, ChevronRight, Pause, Play, RotateCcw } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Pause, Play, RotateCcw } from "lucide-react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { buildHandJoints, FINGER_JOINTS, FINGERS, HAND_SCALE, SCENE_Y_OFFSET } from "./handRig.js";
@@ -100,6 +100,15 @@ function initialState(keyframe) {
     csvLine: 1,
     anchorLoop: 1,
     keyframeLock: true,
+  };
+}
+
+function frameFromKeyframe(keyframe, index = 0) {
+  return {
+    ...initialState(keyframe),
+    targetIndex: index,
+    csvLine: index + 2,
+    target_frame: keyframe.frame_id,
   };
 }
 
@@ -440,7 +449,11 @@ function App() {
   const keyframeCsvRef = useRef("");
   const [frame, setFrame] = useState(frameRef.current);
   const sequenceIndexRef = useRef(0);
+  const keyframeIndexRef = useRef(0);
+  const keyframeTickRef = useRef(0);
   const [running, setRunning] = useState(true);
+  const [playMode, setPlayMode] = useState("prediction");
+  const [selectedKeyframeIndex, setSelectedKeyframeIndex] = useState(0);
   const [renderError, setRenderError] = useState("");
   const [expandedSegments, setExpandedSegments] = useState({});
 
@@ -469,7 +482,7 @@ function App() {
         setKeyframeCsv(csv);
         setKeyframes(loadedKeyframes);
         setPolicy({ ...DEFAULT_POLICY, ...loadedPolicy });
-        frameRef.current = initialState(loadedKeyframes[0]);
+        frameRef.current = frameFromKeyframe(loadedKeyframes[0], 0);
         setFrame(frameRef.current);
         setDataStatus("loaded");
       })
@@ -501,8 +514,9 @@ function App() {
           keyframeCsvRef.current = csv;
           setKeyframeCsv(csv);
           setKeyframes(loadedKeyframes);
+          setSelectedKeyframeIndex((current) => Math.min(current, loadedKeyframes.length - 1));
           if (!frameRef.current) {
-            frameRef.current = initialState(loadedKeyframes[0]);
+            frameRef.current = frameFromKeyframe(loadedKeyframes[0], 0);
             setFrame(frameRef.current);
           }
           setDataStatus("loaded");
@@ -542,27 +556,29 @@ function App() {
           setSequenceFrames(frames);
           sequenceIndexRef.current = 0;
           const first = frames[0];
-          frameRef.current = {
-            frame_t_ms: first.frame_t_ms,
-            targetIndex: 0,
-            x: first.x,
-            y: first.y,
-            z: first.z,
-            yaw: first.yaw,
-            pitch: first.pitch,
-            roll: first.roll,
-            grip: first.grip,
-            vx: 0,
-            vy: 0,
-            vz: 0,
-            error: 0,
-            confidence: 1,
-            csvLine: first.csvLine,
-            anchorLoop: 1,
-            target_frame: first.target_frame,
-            keyframeLock: keyframes.some((keyframe) => keyframe.t_ms === Math.round(first.frame_t_ms)),
-          };
-          setFrame(frameRef.current);
+          if (playMode === "prediction") {
+            frameRef.current = {
+              frame_t_ms: first.frame_t_ms,
+              targetIndex: 0,
+              x: first.x,
+              y: first.y,
+              z: first.z,
+              yaw: first.yaw,
+              pitch: first.pitch,
+              roll: first.roll,
+              grip: first.grip,
+              vx: 0,
+              vy: 0,
+              vz: 0,
+              error: 0,
+              confidence: 1,
+              csvLine: first.csvLine,
+              anchorLoop: 1,
+              target_frame: first.target_frame,
+              keyframeLock: keyframes.some((keyframe) => keyframe.t_ms === Math.round(first.frame_t_ms)),
+            };
+            setFrame(frameRef.current);
+          }
           setSequenceStatus("loaded");
         })
         .catch(() => {
@@ -586,13 +602,30 @@ function App() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [sequenceCsv]);
+  }, [keyframes, playMode, sequenceCsv]);
 
   useEffect(() => {
     if (!running || keyframes.length === 0 || !frameRef.current) {
       return undefined;
     }
     const timer = window.setInterval(() => {
+      if (playMode === "keyframes") {
+        const now = performance.now();
+        if (!running && frameRef.current?.targetIndex === selectedKeyframeIndex) {
+          return;
+        }
+        if (running && now - keyframeTickRef.current < ANCHOR_MS) {
+          return;
+        }
+        const nextIndex = running ? (keyframeIndexRef.current + 1) % keyframes.length : selectedKeyframeIndex;
+        keyframeTickRef.current = now;
+        keyframeIndexRef.current = nextIndex;
+        setSelectedKeyframeIndex(nextIndex);
+        frameRef.current = frameFromKeyframe(keyframes[nextIndex], nextIndex);
+        setFrame(frameRef.current);
+        return;
+      }
+
       if (sequenceFrames.length > 0) {
         const currentIndex = sequenceIndexRef.current;
         const nextIndex = nextSequenceIndexByTime(sequenceFrames, currentIndex, RENDER_MS);
@@ -636,14 +669,14 @@ function App() {
       next.csvLine = targetIndex + 1;
       next.anchorLoop = anchorLoop;
       if (next.frame_t_ms > keyframes[keyframes.length - 1].t_ms && targetIndex === keyframes.length - 1 && next.error < target.tolerance) {
-        next = initialState(keyframes[0]);
+        next = frameFromKeyframe(keyframes[0], 0);
         next.anchorLoop = anchorLoop + 1;
       }
       frameRef.current = next;
       setFrame(next);
     }, RENDER_MS);
     return () => window.clearInterval(timer);
-  }, [keyframes, policy, running, sequenceFrames, sequenceResult]);
+  }, [keyframes, playMode, policy, running, selectedKeyframeIndex, sequenceFrames, sequenceResult]);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -722,12 +755,27 @@ function App() {
     if (keyframes.length === 0) {
       return;
     }
-    frameRef.current = initialState(keyframes[0]);
+    frameRef.current = frameFromKeyframe(keyframes[0], 0);
+    keyframeIndexRef.current = 0;
+    keyframeTickRef.current = 0;
+    setSelectedKeyframeIndex(0);
     sequenceIndexRef.current = 0;
     setFrame(frameRef.current);
   }
 
-  const sequenceMode = sequenceFrames.length > 0;
+  function showKeyframe(index) {
+    if (!keyframes[index]) {
+      return;
+    }
+    setRunning(false);
+    setPlayMode("keyframes");
+    setSelectedKeyframeIndex(index);
+    keyframeIndexRef.current = index;
+    frameRef.current = frameFromKeyframe(keyframes[index], index);
+    setFrame(frameRef.current);
+  }
+
+  const sequenceMode = playMode === "prediction" && sequenceFrames.length > 0;
   const sequenceTimeline = useMemo(() => buildSequenceTimeline(sequenceFrames, keyframes), [sequenceFrames, keyframes]);
 
   if (!frame || keyframes.length === 0) {
@@ -824,6 +872,32 @@ function App() {
             <span>{sequenceMode ? RESULT_URL : POLICY_URL}</span>
           </div>
 
+          <div className="playback-panel">
+            <div className="mode-toggle" role="group" aria-label="playback mode">
+              <button type="button" className={playMode === "prediction" ? "active" : ""} onClick={() => setPlayMode("prediction")}>
+                Prediction
+              </button>
+              <button type="button" className={playMode === "keyframes" ? "active" : ""} onClick={() => setPlayMode("keyframes")}>
+                Keyframes
+              </button>
+            </div>
+            <div className="keyframe-picker">
+              <button type="button" onClick={() => showKeyframe((selectedKeyframeIndex - 1 + keyframes.length) % keyframes.length)} title="Previous keyframe">
+                <ChevronLeft size={16} />
+              </button>
+              <select value={selectedKeyframeIndex} onChange={(event) => showKeyframe(Number(event.target.value))}>
+                {keyframes.map((item, index) => (
+                  <option value={index} key={item.frame_id}>
+                    {String(index).padStart(2, "0")} {item.frame_id}
+                  </option>
+                ))}
+              </select>
+              <button type="button" onClick={() => showKeyframe((selectedKeyframeIndex + 1) % keyframes.length)} title="Next keyframe">
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+
           <div className="timeline">
             <div className="timeline-head">
               <span>{sequenceMode ? "realtime prediction csv" : "keyframe script"}</span>
@@ -867,11 +941,11 @@ function App() {
                     );
                   })
                 : keyframes.map((item, index) => (
-                    <div className={index === frame.targetIndex ? "keyframe keyframe-anchor active" : "keyframe keyframe-anchor"} key={item.frame_id}>
+                    <button type="button" className={index === frame.targetIndex ? "keyframe keyframe-anchor active" : "keyframe keyframe-anchor"} key={item.frame_id} onClick={() => showKeyframe(index)}>
                       <span>{item.t_ms}</span>
                       <strong>{item.frame_id}</strong>
                       <em>{item.grip.toFixed(2)}</em>
-                    </div>
+                    </button>
                   ))}
             </div>
           </div>
