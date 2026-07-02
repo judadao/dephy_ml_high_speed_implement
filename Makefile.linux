@@ -4,6 +4,8 @@ CFLAGS  ?= -Wall -Wextra -std=c11 -g
 LDFLAGS ?= -lm
 OUTDIR  ?= build_out
 FRAMES  ?= 1000
+WEB_SEED ?= 101
+NOISE_SCALE ?= 1.0
 
 LIB := $(OUTDIR)/libdephy_ml_high_speed_implement.a
 OBJS := $(OUTDIR)/src/bitmap_anim.o $(OUTDIR)/src/joint_predictor.o $(OUTDIR)/src/hand_predictor.o
@@ -82,11 +84,11 @@ web-install:
 
 web-demo-data:
 	mkdir -p web/public/demo
-	cp examples/hand/hand_keyframes.csv web/public/demo/hand_keyframes.csv
 	cp examples/hand/hand_policy.json web/public/demo/hand_policy.json
 	mkdir -p web/public/demo/hand_sequence
-	if [ -f $(OUTDIR)/hand_sequence/prediction.csv ]; then cp $(OUTDIR)/hand_sequence/prediction.csv web/public/demo/hand_sequence/prediction.csv; fi
-	if [ -f $(OUTDIR)/hand_sequence/result.json ]; then cp $(OUTDIR)/hand_sequence/result.json web/public/demo/hand_sequence/result.json; fi
+	if [ ! -f $(OUTDIR)/hand_sequence/model.json ]; then OUTDIR=$(OUTDIR) sh scripts/test_hand_sequence_model.sh >/dev/null; fi
+	python3 scripts/generate_random_hand_keyframes.py --out web/public/demo/hand_keyframes.csv --count 5 --sample-ms 300 --seed $(WEB_SEED) --noise-scale $(NOISE_SCALE)
+	python3 scripts/dephy_hand_sequence_predict.py --keyframes web/public/demo/hand_keyframes.csv --model $(OUTDIR)/hand_sequence/model.json --out web/public/demo/hand_sequence/prediction.csv --result web/public/demo/hand_sequence/result.json --render-ms 16 --frames $(FRAMES)
 
 web-build: web-demo-data
 	npm --prefix web run build
