@@ -86,6 +86,7 @@ button {
 .stage canvas {
   display: block;
   cursor: grab;
+  touch-action: none;
 }
 
 .stage canvas:active {

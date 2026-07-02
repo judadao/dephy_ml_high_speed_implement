@@ -704,8 +704,10 @@ function App() {
     controls.target.set(0.0, -0.42, 0);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-    controls.minDistance = 1.0;
-    controls.maxDistance = 4.2;
+    controls.enableZoom = true;
+    controls.zoomSpeed = 1.15;
+    controls.minDistance = 0.7;
+    controls.maxDistance = 8.0;
 
     const hemi = new THREE.HemisphereLight(0xb7d7ff, 0x111923, 1.7);
     const key = new THREE.DirectionalLight(0xffffff, 2.4);
