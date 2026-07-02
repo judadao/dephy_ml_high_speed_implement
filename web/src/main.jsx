@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Pause, Play, RotateCcw } from "lucide-react";
+import { ChevronDown, ChevronRight, Pause, Play, RotateCcw } from "lucide-react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import "./styles.css";
@@ -99,6 +99,63 @@ function initialState(keyframe) {
     csvLine: 1,
     anchorLoop: 1,
   };
+}
+
+function frameDistance(frame, keyframe) {
+  const pos = Math.hypot(keyframe.x - frame.x, keyframe.y - frame.y, keyframe.z - frame.z);
+  const rot = Math.hypot(keyframe.yaw - frame.yaw, keyframe.pitch - frame.pitch, keyframe.roll - frame.roll);
+  const grip = Math.abs(keyframe.grip - frame.grip);
+  return pos + rot * 0.18 + grip * 0.12;
+}
+
+function nearestFrameIndex(frames, keyframe, startIndex) {
+  let bestIndex = startIndex;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (let index = startIndex; index < frames.length; index += 1) {
+    const distance = frameDistance(frames[index], keyframe);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  }
+  return bestIndex;
+}
+
+function buildSequenceTimeline(frames, keyframes) {
+  if (frames.length === 0 || keyframes.length === 0) {
+    return [];
+  }
+
+  let cursor = 0;
+  const anchors = keyframes.map((keyframe, index) => {
+    const frameIndex = nearestFrameIndex(frames, keyframe, cursor);
+    cursor = Math.min(frameIndex + 1, frames.length - 1);
+    return {
+      type: "keyframe",
+      key: `keyframe-${keyframe.frame_id}-${index}`,
+      keyframe,
+      frame: frames[frameIndex],
+      frameIndex,
+    };
+  });
+
+  const blocks = [];
+  anchors.forEach((anchor, index) => {
+    blocks.push(anchor);
+    const nextAnchor = anchors[index + 1];
+    if (!nextAnchor) {
+      return;
+    }
+    const predicted = frames.slice(anchor.frameIndex + 1, nextAnchor.frameIndex);
+    blocks.push({
+      type: "prediction",
+      key: `prediction-${anchor.keyframe.frame_id}-${nextAnchor.keyframe.frame_id}`,
+      from: anchor.keyframe,
+      to: nextAnchor.keyframe,
+      frames: predicted,
+    });
+  });
+  return blocks;
 }
 
 function errorToTarget(state, target) {
@@ -357,6 +414,7 @@ function App() {
   const sequenceIndexRef = useRef(0);
   const [running, setRunning] = useState(true);
   const [renderError, setRenderError] = useState("");
+  const [expandedSegments, setExpandedSegments] = useState({});
 
   useEffect(() => {
     let cancelled = false;
@@ -598,6 +656,9 @@ function App() {
     setFrame(frameRef.current);
   }
 
+  const sequenceMode = sequenceFrames.length > 0;
+  const sequenceTimeline = useMemo(() => buildSequenceTimeline(sequenceFrames, keyframes), [sequenceFrames, keyframes]);
+
   if (!frame || keyframes.length === 0) {
     return (
       <main className="app-shell">
@@ -612,7 +673,6 @@ function App() {
     );
   }
 
-  const sequenceMode = sequenceFrames.length > 0;
   const target = sequenceMode
     ? { frame_id: frame.target_frame || "sequence", grip: frame.grip, tolerance: 0.001 }
     : keyframes[frame.targetIndex] || keyframes[0];
@@ -642,6 +702,10 @@ function App() {
     ["error", sequenceResult ? Number(sequenceResult.final_error).toFixed(5) : "-"],
     ["jump", sequenceResult ? Number(sequenceResult.max_position_jump).toFixed(4) : "-"],
   ];
+
+  const toggleSegment = (key) => {
+    setExpandedSegments((current) => ({ ...current, [key]: !current[key] }));
+  };
 
   return (
     <main className="app-shell">
@@ -694,15 +758,43 @@ function App() {
             </div>
             <div className="keyframe-list">
               {sequenceMode
-                ? sequenceFrames.slice(Math.max(0, sequenceIndexRef.current - 2), sequenceIndexRef.current + 3).map((item) => (
-                    <div className={item.csvLine === frame.csvLine ? "keyframe active" : "keyframe"} key={`${item.csvLine}-${item.frame_t_ms}`}>
-                      <span>{item.frame_t_ms}</span>
-                      <strong>{item.target_frame}</strong>
-                      <em>{item.grip.toFixed(2)}</em>
-                    </div>
-                  ))
+                ? sequenceTimeline.map((block) => {
+                    if (block.type === "keyframe") {
+                      const isActive = block.frame?.csvLine === frame.csvLine || block.keyframe.frame_id === frame.target_frame;
+                      return (
+                        <div className={isActive ? "keyframe keyframe-anchor active" : "keyframe keyframe-anchor"} key={block.key}>
+                          <span>{block.frame?.frame_t_ms ?? block.keyframe.t_ms}</span>
+                          <strong>{block.keyframe.frame_id}</strong>
+                          <em>{block.keyframe.grip.toFixed(2)}</em>
+                        </div>
+                      );
+                    }
+                    const isOpen = Boolean(expandedSegments[block.key]);
+                    const isActive = block.frames.some((item) => item.csvLine === frame.csvLine);
+                    return (
+                      <div className={isActive ? "prediction-segment active" : "prediction-segment"} key={block.key}>
+                        <button type="button" className="segment-toggle" onClick={() => toggleSegment(block.key)}>
+                          {isOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                          <span>{block.from.frame_id}</span>
+                          <strong>{block.frames.length} predicted</strong>
+                          <span>{block.to.frame_id}</span>
+                        </button>
+                        {isOpen ? (
+                          <div className="predicted-list">
+                            {block.frames.map((item) => (
+                              <div className={item.csvLine === frame.csvLine ? "prediction-frame active" : "prediction-frame"} key={`${item.csvLine}-${item.frame_t_ms}`}>
+                                <span>{item.frame_t_ms}</span>
+                                <strong>{item.target_frame}</strong>
+                                <em>{item.grip.toFixed(2)}</em>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })
                 : keyframes.map((item, index) => (
-                    <div className={index === frame.targetIndex ? "keyframe active" : "keyframe"} key={item.frame_id}>
+                    <div className={index === frame.targetIndex ? "keyframe keyframe-anchor active" : "keyframe keyframe-anchor"} key={item.frame_id}>
                       <span>{item.t_ms}</span>
                       <strong>{item.frame_id}</strong>
                       <em>{item.grip.toFixed(2)}</em>
