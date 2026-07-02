@@ -45,7 +45,7 @@ static int parse_f32(const char *text, float *out)
 static void usage(const char *argv0)
 {
     fprintf(stderr,
-            "usage: %s (--keyframes FILE|--from-hand-stream FILE) [--observed-input] [--policy FILE] [--render-ms 16] [--max-speed N] [--max-accel N]\n",
+            "usage: %s (--keyframes FILE|--from-hand-stream FILE) [--observed-input] [--policy FILE] [--result FILE] [--render-ms 16] [--max-speed N] [--max-accel N]\n",
             argv0);
 }
 
@@ -326,25 +326,52 @@ static void print_state(const dephy_hand_state_t *state,
            state->reached);
 }
 
-static void correct_state_from_observation(dephy_hand_state_t *state,
-                                           const dephy_hand_keyframe_t *observed)
+static int write_result_json(const char *path,
+                             const char *mode,
+                             size_t keyframe_count,
+                             size_t prediction_frames,
+                             size_t observation_count,
+                             size_t reached_count,
+                             const dephy_hand_state_t *final_state)
 {
-    float correction = 0.65f;
+    FILE *fp;
+    int success;
 
-    if (!state || !observed) {
-        return;
+    if (!path || !mode || !final_state) {
+        return 0;
     }
-    state->t_ms = observed->t_ms;
-    state->x += (observed->x - state->x) * correction;
-    state->y += (observed->y - state->y) * correction;
-    state->z += (observed->z - state->z) * correction;
-    state->yaw += (observed->yaw - state->yaw) * correction;
-    state->pitch += (observed->pitch - state->pitch) * correction;
-    state->roll += (observed->roll - state->roll) * correction;
-    state->grip += (observed->grip - state->grip) * correction;
-    state->error = dephy_hand_state_error_to_keyframe(state, observed);
-    state->confidence = state->error < 0.1f ? 0.9f : 0.72f;
-    state->reached = dephy_hand_state_reached_keyframe(state, observed);
+
+    fp = fopen(path, "w");
+    if (!fp) {
+        perror(path);
+        return -1;
+    }
+
+    success = final_state->reached || (strcmp(mode, "observed") == 0 && final_state->error <= 0.05f);
+    fprintf(fp,
+            "{\n"
+            "  \"format\": \"dephy_hand_prediction_result_v1\",\n"
+            "  \"mode\": \"%s\",\n"
+            "  \"keyframes\": %zu,\n"
+            "  \"prediction_frames\": %zu,\n"
+            "  \"observations\": %zu,\n"
+            "  \"reached_keyframes\": %zu,\n"
+            "  \"final_t_ms\": %u,\n"
+            "  \"final_error\": %.5f,\n"
+            "  \"final_confidence\": %.3f,\n"
+            "  \"success\": %s\n"
+            "}\n",
+            mode,
+            keyframe_count,
+            prediction_frames,
+            observation_count,
+            reached_count,
+            final_state->t_ms,
+            final_state->error,
+            final_state->confidence,
+            success ? "true" : "false");
+    fclose(fp);
+    return 0;
 }
 
 int main(int argc, char **argv)
@@ -355,8 +382,12 @@ int main(int argc, char **argv)
     const char *keyframe_path = 0;
     const char *hand_stream_path = 0;
     const char *policy_path = 0;
+    const char *result_path = 0;
     size_t keyframe_count = 0;
     size_t target_index;
+    size_t prediction_frames = 0;
+    size_t observation_count = 0;
+    size_t reached_count = 0;
     int observed_input = 0;
     int i;
 
@@ -367,6 +398,8 @@ int main(int argc, char **argv)
             hand_stream_path = argv[++i];
         } else if (strcmp(argv[i], "--policy") == 0 && i + 1 < argc) {
             policy_path = argv[++i];
+        } else if (strcmp(argv[i], "--result") == 0 && i + 1 < argc) {
+            result_path = argv[++i];
         } else if (strcmp(argv[i], "--observed-input") == 0) {
             observed_input = 1;
         } else if (strcmp(argv[i], "--render-ms") == 0 && i + 1 < argc) {
@@ -413,6 +446,9 @@ int main(int argc, char **argv)
     state = dephy_hand_state_from_keyframe(&keyframes[0]);
     printf("frame_t_ms,target_frame,palm_x,palm_y,palm_z,yaw,pitch,roll,grip,vx,vy,vz,error,confidence,reached\n");
     print_state(&state, &keyframes[0]);
+    prediction_frames = 1;
+    reached_count = state.reached ? 1 : 0;
+    observation_count = observed_input ? 1 : 0;
 
     for (target_index = 1; target_index < keyframe_count; ++target_index) {
         const dephy_hand_keyframe_t *target = &keyframes[target_index];
@@ -428,10 +464,16 @@ int main(int argc, char **argv)
                 dephy_hand_predict_step(&config, &state, target, &next);
                 state = next;
                 print_state(&state, target);
+                ++prediction_frames;
                 ++guard_frames;
             }
-            correct_state_from_observation(&state, target);
+            dephy_hand_correct_from_observation(&config, &state, target, &state);
             print_state(&state, target);
+            ++prediction_frames;
+            ++observation_count;
+            if (state.reached) {
+                ++reached_count;
+            }
             continue;
         }
 
@@ -441,6 +483,7 @@ int main(int argc, char **argv)
             dephy_hand_predict_step(&config, &state, target, &next);
             state = next;
             print_state(&state, target);
+            ++prediction_frames;
 
             if (state.reached) {
                 held_ms += config.render_period_ms;
@@ -457,6 +500,17 @@ int main(int argc, char **argv)
             fprintf(stderr, "failed to reach keyframe: %s\n", target->frame_id);
             return 1;
         }
+        ++reached_count;
+    }
+
+    if (write_result_json(result_path,
+                          observed_input ? "observed" : "keyframe",
+                          keyframe_count,
+                          prediction_frames,
+                          observation_count,
+                          reached_count,
+                          &state) != 0) {
+        return 1;
     }
 
     return 0;

@@ -57,12 +57,22 @@ make -f Makefile.linux web
 
 ## Single Palm Keyframe Prediction
 
+Core development does not depend on the web demo. The required artifacts are:
+
+```txt
+keyframes.csv    input anchors or observed IO samples
+prediction.csv   generated high-rate frames
+result.json      run summary and pass/fail metrics
+```
+
 Run deterministic bounded prediction:
 
 ```sh
 build_out/dephy_hand_predict \
   --keyframes scenarios/hand/slow_io_fast_prediction.csv \
-  --render-ms 16 > build_out/hand_frames.csv
+  --render-ms 16 \
+  --result build_out/hand_result.json \
+  > build_out/hand_frames.csv
 ```
 
 Train a small dependency-free RL policy:
@@ -81,13 +91,32 @@ Run the C predictor with the exported policy:
 build_out/dephy_hand_predict \
   --keyframes scenarios/hand/turn_and_move.csv \
   --policy build_out/hand_policy.json \
-  --render-ms 16 > build_out/hand_policy_frames.csv
+  --render-ms 16 \
+  --result build_out/hand_policy_result.json \
+  > build_out/hand_policy_frames.csv
 ```
 
 CSV output:
 
 ```txt
 frame_t_ms,target_frame,palm_x,palm_y,palm_z,yaw,pitch,roll,grip,vx,vy,vz,error,confidence,reached
+```
+
+Result JSON:
+
+```json
+{
+  "format": "dephy_hand_prediction_result_v1",
+  "mode": "keyframe",
+  "keyframes": 2,
+  "prediction_frames": 42,
+  "observations": 0,
+  "reached_keyframes": 2,
+  "final_t_ms": 656,
+  "final_error": 0.00850,
+  "final_confidence": 0.898,
+  "success": true
+}
 ```
 
 The current policy artifact is a small gain-based controller trained in the
@@ -152,7 +181,9 @@ Use the recorded keyframes directly:
 build_out/dephy_hand_predict \
   --keyframes build_out/recorded_hand_keyframes.csv \
   --policy examples/hand/hand_policy.json \
-  --render-ms 16 > build_out/recorded_hand_frames.csv
+  --render-ms 16 \
+  --result build_out/recorded_hand_result.json \
+  > build_out/recorded_hand_frames.csv
 ```
 
 When the CSV came from real IO observations or the simulator IO adapter, values
@@ -165,7 +196,9 @@ build_out/dephy_hand_predict \
   --keyframes build_out/hand_io_observed_keyframes.csv \
   --observed-input \
   --policy examples/hand/hand_policy.json \
-  --render-ms 16 > build_out/hand_io_observed_frames.csv
+  --render-ms 16 \
+  --result build_out/hand_io_observed_result.json \
+  > build_out/hand_io_observed_frames.csv
 ```
 
 Or train a new policy from recorded/scenario keyframes:

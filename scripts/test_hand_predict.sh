@@ -2,12 +2,17 @@
 set -eu
 
 out="${OUTDIR:-build_out}/hand_straight.csv"
+result="${OUTDIR:-build_out}/hand_straight_result.json"
 "${OUTDIR:-build_out}/dephy_hand_predict" \
     --keyframes scenarios/hand/straight_move.csv \
-    --render-ms 16 > "$out"
+    --render-ms 16 \
+    --result "$result" > "$out"
 
 grep -q '^frame_t_ms,target_frame,palm_x,palm_y,palm_z' "$out"
 grep -q ',reach,' "$out"
+grep -q '"format": "dephy_hand_prediction_result_v1"' "$result"
+grep -q '"mode": "keyframe"' "$result"
+grep -q '"success": true' "$result"
 tail -n 1 "$out" | awk -F, '{ if ($15 != "1") exit 1; if ($13 > 0.02) exit 1; }'
 
 grip_out="${OUTDIR:-build_out}/hand_grip.csv"
@@ -58,6 +63,7 @@ if [ -x "$io_repo/build_out/linux_io_device_simul" ]; then
     observed_hand="${OUTDIR:-build_out}/hand_io_observed_keyframes.out"
     observed_csv="${OUTDIR:-build_out}/hand_io_observed_keyframes.csv"
     observed_frames="${OUTDIR:-build_out}/hand_io_observed_frames.csv"
+    observed_result="${OUTDIR:-build_out}/hand_io_observed_result.json"
     "$io_repo/build_out/linux_io_device_simul" \
         --slot-stream \
         --loop 1 \
@@ -74,6 +80,10 @@ if [ -x "$io_repo/build_out/linux_io_device_simul" ]; then
         --keyframes "$observed_csv" \
         --observed-input \
         --policy examples/hand/hand_policy.json \
-        --render-ms 16 > "$observed_frames"
+        --render-ms 16 \
+        --result "$observed_result" > "$observed_frames"
     grep -q ',io_obs_0024,' "$observed_frames"
+    grep -q '"mode": "observed"' "$observed_result"
+    grep -q '"observations": 39' "$observed_result"
+    grep -q '"success": true' "$observed_result"
 fi

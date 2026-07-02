@@ -67,6 +67,7 @@ dephy_hand_predictor_config_t dephy_hand_predictor_default_config(void)
     config.kp_rot = 7.0f;
     config.kd_rot = 1.8f;
     config.kp_grip = 8.0f;
+    config.observation_correction = 0.65f;
     return config;
 }
 
@@ -213,4 +214,44 @@ void dephy_hand_predict_step(const dephy_hand_predictor_config_t *config,
     next->error = dephy_hand_state_error_to_keyframe(next, target);
     next->reached = dephy_hand_state_reached_keyframe(next, target);
     next->confidence = clamp_f32(0.65f + (1.0f - next->error) * 0.25f, 0.2f, 0.98f);
+}
+
+void dephy_hand_correct_from_observation(const dephy_hand_predictor_config_t *config,
+                                         const dephy_hand_state_t *current,
+                                         const dephy_hand_keyframe_t *observed,
+                                         dephy_hand_state_t *corrected)
+{
+    dephy_hand_predictor_config_t local_config;
+    float correction;
+
+    if (!current || !observed || !corrected) {
+        return;
+    }
+
+    local_config = config ? *config : dephy_hand_predictor_default_config();
+    correction = clamp_f32(local_config.observation_correction, 0.0f, 1.0f);
+
+    *corrected = *current;
+    corrected->t_ms = observed->t_ms;
+    corrected->x += (observed->x - corrected->x) * correction;
+    corrected->y += (observed->y - corrected->y) * correction;
+    corrected->z += (observed->z - corrected->z) * correction;
+    corrected->yaw += (observed->yaw - corrected->yaw) * correction;
+    corrected->pitch += (observed->pitch - corrected->pitch) * correction;
+    corrected->roll += (observed->roll - corrected->roll) * correction;
+    corrected->grip = clamp_f32(corrected->grip + (observed->grip - corrected->grip) * correction,
+                                0.0f,
+                                1.0f);
+    corrected->error = dephy_hand_state_error_to_keyframe(corrected, observed);
+    corrected->reached = dephy_hand_state_reached_keyframe(corrected, observed);
+    corrected->confidence = corrected->error < 0.1f ? 0.9f : 0.72f;
+    if (observed->safety_hold) {
+        corrected->vx = 0.0f;
+        corrected->vy = 0.0f;
+        corrected->vz = 0.0f;
+        corrected->ax = 0.0f;
+        corrected->ay = 0.0f;
+        corrected->az = 0.0f;
+        corrected->confidence = 1.0f;
+    }
 }

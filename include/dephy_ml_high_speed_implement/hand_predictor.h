@@ -56,6 +56,7 @@ typedef struct {
     float kp_rot;
     float kd_rot;
     float kp_grip;
+    float observation_correction;
 } dephy_hand_predictor_config_t;
 
 dephy_hand_predictor_config_t dephy_hand_predictor_default_config(void);
@@ -68,6 +69,10 @@ void dephy_hand_predict_step(const dephy_hand_predictor_config_t *config,
                              const dephy_hand_state_t *current,
                              const dephy_hand_keyframe_t *target,
                              dephy_hand_state_t *next);
+void dephy_hand_correct_from_observation(const dephy_hand_predictor_config_t *config,
+                                         const dephy_hand_state_t *current,
+                                         const dephy_hand_keyframe_t *observed,
+                                         dephy_hand_state_t *corrected);
 
 #ifdef __cplusplus
 }
