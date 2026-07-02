@@ -270,10 +270,10 @@ segment writes the final frame exactly at the requested keyframe. Smoothness is
 validated with per-frame jump limits relative to the segment distance, so large
 valid moves are allowed while snap-style negative samples are rejected.
 
-`--frames 1000` asks the sequence predictor to distribute exactly 1000
-prediction rows across the full keyframe path. The keyframe rows remain exact
-anchors, while the extra rows become dense predicted frames between them. Omit
-`--frames` to fall back to the lower-rate `--render-ms` spacing.
+`--frames 1000` means **1000 predicted rows between every keyframe pair**. The
+CSV also keeps the exact keyframe anchor rows, so five keyframes produce
+`5 + (5 - 1) * 1000 = 4005` rows. Omit `--frames` to fall back to the
+lower-rate `--render-ms` spacing.
 
 ## Web Hand Demo
 
@@ -306,12 +306,22 @@ The writer loop keeps regenerating the core prediction artifacts and atomically
 updates the served CSV/JSON. The browser reloads the updated CSV without doing
 prediction inside React.
 
-By default the writer loop uses `FRAMES=1000`, so the web demo shows a dense
-1000-frame prediction stream. Override it when needed:
+By default the writer loop uses `RANDOM_INIT=1`, `NOISE_SCALE=1.0`, and
+`FRAMES=1000`. Every loop generates a new noisy random keyframe path, writes
+1000 predicted rows between each pair of yellow keyframe anchors, and appends
+completion metrics to `result.json`.
+
+Override it when needed:
 
 ```sh
 FRAMES=300 make -f Makefile.linux web-sequence-demo-loop
+RANDOM_INIT=0 make -f Makefile.linux web-sequence-demo-loop
+NOISE_SCALE=2.0 make -f Makefile.linux web-sequence-demo-loop
 ```
+
+The completion metric is intentionally measured across changing input paths,
+not one repeated clean script. The test suite covers both noisy template
+keyframes and one fully random keyframe path.
 
 The demo is browser-side only: it loads CSV keyframe fixtures that mirror the
 device loop, then applies the same bounded prediction idea to update palm

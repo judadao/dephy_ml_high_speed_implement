@@ -428,6 +428,7 @@ function App() {
   const [sequenceStatus, setSequenceStatus] = useState("waiting");
   const [dataStatus, setDataStatus] = useState("loading");
   const frameRef = useRef(null);
+  const keyframeCsvRef = useRef("");
   const [frame, setFrame] = useState(frameRef.current);
   const sequenceIndexRef = useRef(0);
   const [running, setRunning] = useState(true);
@@ -455,6 +456,7 @@ function App() {
           return;
         }
         const loadedKeyframes = parseCsv(csv);
+        keyframeCsvRef.current = csv;
         setKeyframeCsv(csv);
         setKeyframes(loadedKeyframes);
         setPolicy({ ...DEFAULT_POLICY, ...loadedPolicy });
@@ -469,6 +471,43 @@ function App() {
       });
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadKeyframes = () => {
+      fetch(`${KEYFRAME_URL}?t=${Date.now()}`, { cache: "no-store" })
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error(KEYFRAME_URL);
+          }
+          return response.text();
+        })
+        .then((csv) => {
+          if (cancelled || csv === keyframeCsvRef.current) {
+            return;
+          }
+          const loadedKeyframes = parseCsv(csv);
+          keyframeCsvRef.current = csv;
+          setKeyframeCsv(csv);
+          setKeyframes(loadedKeyframes);
+          if (!frameRef.current) {
+            frameRef.current = initialState(loadedKeyframes[0]);
+            setFrame(frameRef.current);
+          }
+          setDataStatus("loaded");
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setDataStatus("load error");
+          }
+        });
+    };
+    const timer = window.setInterval(loadKeyframes, 1000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
     };
   }, []);
 
@@ -717,6 +756,8 @@ function App() {
     ["frames", sequenceMode ? sequenceFrames.length : keyframes.length],
     ["status", sequenceStatus],
     ["success", sequenceResult ? String(sequenceResult.success) : "-"],
+    ["completion", sequenceResult?.completion_rate !== undefined ? Number(sequenceResult.completion_rate).toFixed(3) : "-"],
+    ["trials", sequenceResult?.completion_trials ?? "-"],
     ["error", sequenceResult ? Number(sequenceResult.final_error).toFixed(5) : "-"],
     ["jump", sequenceResult ? Number(sequenceResult.max_position_jump).toFixed(4) : "-"],
   ];

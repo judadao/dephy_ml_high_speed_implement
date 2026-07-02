@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import math
 from pathlib import Path
 
 from train_hand_sequence_model import pose_error
@@ -33,34 +32,14 @@ def exact_smooth_segment(model: dict, start: list[float], target: list[float], s
     return frames
 
 
-def allocate_intervals(keyframes: list[dict], target_frames: int | None, render_ms: int) -> list[int]:
-    if target_frames is None:
+def allocate_intervals(keyframes: list[dict], frames_between_keyframes: int | None, render_ms: int) -> list[int]:
+    if frames_between_keyframes is None:
         return [max(1, (target["t_ms"] - start["t_ms"]) // render_ms) for start, target in zip(keyframes, keyframes[1:])]
 
-    min_frames = len(keyframes)
-    if target_frames < min_frames:
-        raise ValueError(f"--frames must be at least {min_frames}")
+    if frames_between_keyframes < 0:
+        raise ValueError("--frames must be zero or greater")
 
-    total_intervals = target_frames - 1
-    durations = [max(1, target["t_ms"] - start["t_ms"]) for start, target in zip(keyframes, keyframes[1:])]
-    duration_total = sum(durations)
-    raw = [(duration / duration_total) * total_intervals for duration in durations]
-    intervals = [max(1, math.floor(value)) for value in raw]
-
-    while sum(intervals) < total_intervals:
-        fractions = sorted(((raw[index] - math.floor(raw[index]), index) for index in range(len(raw))), reverse=True)
-        for _, index in fractions:
-            if sum(intervals) >= total_intervals:
-                break
-            intervals[index] += 1
-
-    while sum(intervals) > total_intervals:
-        index = max(range(len(intervals)), key=lambda item: intervals[item])
-        if intervals[index] <= 1:
-            break
-        intervals[index] -= 1
-
-    return intervals
+    return [frames_between_keyframes + 1 for _ in zip(keyframes, keyframes[1:])]
 
 
 def frame_time_ms(start_ms: int, target_ms: int, frame_index: int, intervals: int, render_ms: int, fixed_frames: bool) -> float | int:
@@ -113,7 +92,7 @@ def main() -> int:
     parser.add_argument("--out", required=True)
     parser.add_argument("--result", required=True)
     parser.add_argument("--render-ms", type=int, default=16)
-    parser.add_argument("--frames", type=int, help="generate exactly this many prediction rows across all keyframe segments")
+    parser.add_argument("--frames", type=int, help="generate this many predicted rows between every pair of keyframes")
     args = parser.parse_args()
 
     keyframes = load_keyframes(Path(args.keyframes))
@@ -154,7 +133,8 @@ def main() -> int:
                 "model": model.get("format"),
                 "keyframes": len(keyframes),
                 "prediction_frames": len(rows),
-                "requested_frames": args.frames,
+                "frames_between_keyframes": args.frames,
+                "intermediate_prediction_frames": (len(keyframes) - 1) * args.frames if args.frames is not None else None,
                 "render_ms": args.render_ms,
                 "final_error": final_error,
                 **metrics,

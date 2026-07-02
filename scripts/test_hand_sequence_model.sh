@@ -31,5 +31,44 @@ python3 scripts/dephy_hand_sequence_predict.py \
 grep -q '^frame_t_ms,target_frame,palm_x' "$outdir/prediction.csv"
 grep -q '"format": "dephy_hand_sequence_result_v1"' "$outdir/result.json"
 grep -q '"success": true' "$outdir/result.json"
-test "$(($(wc -l < "$outdir/prediction.csv") - 1))" -eq 1000
-grep -q '"prediction_frames": 1000' "$outdir/result.json"
+test "$(($(wc -l < "$outdir/prediction.csv") - 1))" -eq 4005
+grep -q '"frames_between_keyframes": 1000' "$outdir/result.json"
+grep -q '"intermediate_prediction_frames": 4000' "$outdir/result.json"
+grep -q '"prediction_frames": 4005' "$outdir/result.json"
+
+python3 scripts/generate_random_hand_keyframes.py \
+    --out "$outdir/noisy_keyframes.csv" \
+    --template examples/hand/hand_keyframes.csv \
+    --count 5 \
+    --sample-ms 300 \
+    --seed 101 \
+    --noise-scale 1.0
+
+python3 scripts/dephy_hand_sequence_predict.py \
+    --keyframes "$outdir/noisy_keyframes.csv" \
+    --model "$outdir/model.json" \
+    --out "$outdir/noisy_prediction.csv" \
+    --result "$outdir/noisy_result.json" \
+    --render-ms 16 \
+    --frames 1000
+
+grep -q '"success": true' "$outdir/noisy_result.json"
+test "$(($(wc -l < "$outdir/noisy_prediction.csv") - 1))" -eq 4005
+
+python3 scripts/generate_random_hand_keyframes.py \
+    --out "$outdir/full_random_keyframes.csv" \
+    --count 5 \
+    --sample-ms 300 \
+    --seed 202 \
+    --noise-scale 1.0
+
+python3 scripts/dephy_hand_sequence_predict.py \
+    --keyframes "$outdir/full_random_keyframes.csv" \
+    --model "$outdir/model.json" \
+    --out "$outdir/full_random_prediction.csv" \
+    --result "$outdir/full_random_result.json" \
+    --render-ms 16 \
+    --frames 1000
+
+grep -q '"success": true' "$outdir/full_random_result.json"
+test "$(($(wc -l < "$outdir/full_random_prediction.csv") - 1))" -eq 4005
