@@ -45,7 +45,7 @@ static int parse_f32(const char *text, float *out)
 static void usage(const char *argv0)
 {
     fprintf(stderr,
-            "usage: %s (--keyframes FILE|--from-hand-stream FILE) [--policy FILE] [--render-ms 16] [--max-speed N] [--max-accel N]\n",
+            "usage: %s (--keyframes FILE|--from-hand-stream FILE) [--observed-input] [--policy FILE] [--render-ms 16] [--max-speed N] [--max-accel N]\n",
             argv0);
 }
 
@@ -326,6 +326,27 @@ static void print_state(const dephy_hand_state_t *state,
            state->reached);
 }
 
+static void correct_state_from_observation(dephy_hand_state_t *state,
+                                           const dephy_hand_keyframe_t *observed)
+{
+    float correction = 0.65f;
+
+    if (!state || !observed) {
+        return;
+    }
+    state->t_ms = observed->t_ms;
+    state->x += (observed->x - state->x) * correction;
+    state->y += (observed->y - state->y) * correction;
+    state->z += (observed->z - state->z) * correction;
+    state->yaw += (observed->yaw - state->yaw) * correction;
+    state->pitch += (observed->pitch - state->pitch) * correction;
+    state->roll += (observed->roll - state->roll) * correction;
+    state->grip += (observed->grip - state->grip) * correction;
+    state->error = dephy_hand_state_error_to_keyframe(state, observed);
+    state->confidence = state->error < 0.1f ? 0.9f : 0.72f;
+    state->reached = dephy_hand_state_reached_keyframe(state, observed);
+}
+
 int main(int argc, char **argv)
 {
     dephy_hand_predictor_config_t config = dephy_hand_predictor_default_config();
@@ -336,6 +357,7 @@ int main(int argc, char **argv)
     const char *policy_path = 0;
     size_t keyframe_count = 0;
     size_t target_index;
+    int observed_input = 0;
     int i;
 
     for (i = 1; i < argc; ++i) {
@@ -345,6 +367,8 @@ int main(int argc, char **argv)
             hand_stream_path = argv[++i];
         } else if (strcmp(argv[i], "--policy") == 0 && i + 1 < argc) {
             policy_path = argv[++i];
+        } else if (strcmp(argv[i], "--observed-input") == 0) {
+            observed_input = 1;
         } else if (strcmp(argv[i], "--render-ms") == 0 && i + 1 < argc) {
             if (parse_u32(argv[++i], &config.render_period_ms) != 0 || config.render_period_ms == 0) {
                 usage(argv[0]);
@@ -394,6 +418,22 @@ int main(int argc, char **argv)
         const dephy_hand_keyframe_t *target = &keyframes[target_index];
         uint32_t held_ms = 0;
         uint32_t guard_frames = 0;
+
+        if (observed_input) {
+            uint32_t target_time = target->t_ms > state.t_ms ? target->t_ms : state.t_ms + config.render_period_ms;
+
+            while (state.t_ms + config.render_period_ms <= target_time && guard_frames < 20000) {
+                dephy_hand_state_t next;
+
+                dephy_hand_predict_step(&config, &state, target, &next);
+                state = next;
+                print_state(&state, target);
+                ++guard_frames;
+            }
+            correct_state_from_observation(&state, target);
+            print_state(&state, target);
+            continue;
+        }
 
         while (guard_frames < 20000) {
             dephy_hand_state_t next;

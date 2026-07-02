@@ -123,6 +123,29 @@ here:
   > build_out/recorded_hand_keyframes.csv
 ```
 
+If the source is slot IO instead of hand keyframe script, let the simulator map
+the IO stream into observed hand keyframes first:
+
+```sh
+../linux_io_device_simul/build_out/linux_io_device_simul \
+  --slot-stream \
+  --loop 1 \
+  --sample-ms 40 \
+  ../linux_io_device_simul/scripts/hand_io_observed.trigger \
+  > build_out/hand_io_observed.out
+
+../linux_io_device_simul/build_out/linux_io_device_simul \
+  --io-hand-adapter \
+  --frame-prefix io_obs \
+  build_out/hand_io_observed.out \
+  > build_out/hand_io_observed_keyframes.out
+
+../linux_io_device_simul/build_out/linux_io_device_simul \
+  --record-hand-keyframes \
+  build_out/hand_io_observed_keyframes.out \
+  > build_out/hand_io_observed_keyframes.csv
+```
+
 Use the recorded keyframes directly:
 
 ```sh
@@ -130,6 +153,19 @@ build_out/dephy_hand_predict \
   --keyframes build_out/recorded_hand_keyframes.csv \
   --policy examples/hand/hand_policy.json \
   --render-ms 16 > build_out/recorded_hand_frames.csv
+```
+
+When the CSV came from real IO observations or the simulator IO adapter, values
+may jitter and arrive as dense feedback samples. Use `--observed-input` so each
+sample corrects the current state while the predictor fills frames between
+observations:
+
+```sh
+build_out/dephy_hand_predict \
+  --keyframes build_out/hand_io_observed_keyframes.csv \
+  --observed-input \
+  --policy examples/hand/hand_policy.json \
+  --render-ms 16 > build_out/hand_io_observed_frames.csv
 ```
 
 Or train a new policy from recorded/scenario keyframes:

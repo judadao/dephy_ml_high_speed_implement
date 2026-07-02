@@ -53,4 +53,27 @@ if [ -x "$io_repo/build_out/linux_io_device_simul" ]; then
         --render-ms 16 > "$stream_frames"
     grep -q ',closed_reach,' "$stream_frames"
     tail -n 1 "$stream_frames" | awk -F, '{ if ($15 != "1") exit 1; if ($13 > 0.02) exit 1; }'
+
+    observed_io="${OUTDIR:-build_out}/hand_io_observed.out"
+    observed_hand="${OUTDIR:-build_out}/hand_io_observed_keyframes.out"
+    observed_csv="${OUTDIR:-build_out}/hand_io_observed_keyframes.csv"
+    observed_frames="${OUTDIR:-build_out}/hand_io_observed_frames.csv"
+    "$io_repo/build_out/linux_io_device_simul" \
+        --slot-stream \
+        --loop 1 \
+        --sample-ms 40 \
+        "$io_repo/scripts/hand_io_observed.trigger" > "$observed_io"
+    "$io_repo/build_out/linux_io_device_simul" \
+        --io-hand-adapter \
+        --frame-prefix io_obs \
+        "$observed_io" > "$observed_hand"
+    "$io_repo/build_out/linux_io_device_simul" \
+        --record-hand-keyframes \
+        "$observed_hand" > "$observed_csv"
+    "${OUTDIR:-build_out}/dephy_hand_predict" \
+        --keyframes "$observed_csv" \
+        --observed-input \
+        --policy examples/hand/hand_policy.json \
+        --render-ms 16 > "$observed_frames"
+    grep -q ',io_obs_0024,' "$observed_frames"
 fi
