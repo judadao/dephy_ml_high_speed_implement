@@ -9,7 +9,8 @@ fi
 out_dir="${OUTDIR:-build_out}/web-render"
 mkdir -p "$out_dir"
 
-timeout 20s google-chrome \
+chrome_status=0
+timeout 30s google-chrome \
     --headless=new \
     --disable-gpu \
     --no-sandbox \
@@ -18,7 +19,12 @@ timeout 20s google-chrome \
     --screenshot="$out_dir/page.png" \
     --window-size=1440,1000 \
     --virtual-time-budget=3000 \
-    http://127.0.0.1:8091/ >/dev/null 2>"$out_dir/chrome.err"
+    http://127.0.0.1:8091/ >/dev/null 2>"$out_dir/chrome.err" || chrome_status=$?
+
+if [ "$chrome_status" -ne 0 ] && [ "$chrome_status" -ne 124 ]; then
+    cat "$out_dir/chrome.err" >&2
+    exit 1
+fi
 
 if grep -q "Uncaught\\|ReferenceError\\|TypeError" "$out_dir/chrome.err"; then
     cat "$out_dir/chrome.err" >&2

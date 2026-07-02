@@ -4,5 +4,6 @@ build_out/
 out/
 web/node_modules/
 web/dist/
+web/public/demo/
 __pycache__/
 *.pyc

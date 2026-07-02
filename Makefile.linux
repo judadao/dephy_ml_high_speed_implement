@@ -7,7 +7,7 @@ OUTDIR  ?= build_out
 LIB := $(OUTDIR)/libdephy_ml_high_speed_implement.a
 OBJS := $(OUTDIR)/src/bitmap_anim.o $(OUTDIR)/src/joint_predictor.o $(OUTDIR)/src/hand_predictor.o
 
-.PHONY: all structure-audit direct-test test hand-rl-check io-device-pipeline-check zephyr-metadata demo web-install web-build web web-render-check clean
+.PHONY: all structure-audit direct-test test hand-rl-check io-device-pipeline-check zephyr-metadata demo web-demo-data web-install web-build web web-render-check clean
 
 all: $(LIB) $(OUTDIR)/dephy_bitmap_anim $(OUTDIR)/dephy_joint_replay $(OUTDIR)/dephy_hand_predict
 
@@ -72,13 +72,18 @@ demo: $(OUTDIR)/dephy_bitmap_anim
 web-install:
 	npm --prefix web install
 
-web-build:
+web-demo-data:
+	mkdir -p web/public/demo
+	cp examples/hand/hand_keyframes.csv web/public/demo/hand_keyframes.csv
+	cp examples/hand/hand_policy.json web/public/demo/hand_policy.json
+
+web-build: web-demo-data
 	npm --prefix web run build
 
-web:
+web: web-demo-data
 	npm --prefix web run dev -- --host 127.0.0.1 --port 8091
 
-web-render-check:
+web-render-check: web-demo-data
 	OUTDIR=$(OUTDIR) ./scripts/test_web_render.sh
 
 clean:

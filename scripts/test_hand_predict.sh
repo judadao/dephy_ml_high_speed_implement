@@ -49,7 +49,7 @@ if [ -x "$io_repo/build_out/linux_io_device_simul" ]; then
         "$io_repo/scripts/hand_keyframe_demo.script" > "$stream_out"
     "${OUTDIR:-build_out}/dephy_hand_predict" \
         --from-hand-stream "$stream_out" \
-        --policy web/public/demo/hand_policy.json \
+        --policy examples/hand/hand_policy.json \
         --render-ms 16 > "$stream_frames"
     grep -q ',closed_reach,' "$stream_frames"
     tail -n 1 "$stream_frames" | awk -F, '{ if ($15 != "1") exit 1; if ($13 > 0.02) exit 1; }'
