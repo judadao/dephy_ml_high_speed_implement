@@ -112,14 +112,44 @@ button {
   overflow: auto;
 }
 
+.loading-state {
+  display: grid;
+  place-items: center;
+  min-height: calc(100vh - 82px);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 .status-strip {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
 }
 
+.source-strip {
+  display: grid;
+  gap: 6px;
+  padding: 9px 10px;
+  border: 1px solid #263241;
+  border-radius: 7px;
+  background: var(--panel-2);
+}
+
+.source-strip span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #c8d5e4;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .status-strip div,
-.live-grid div {
+.live-grid div,
+.policy-grid div {
   min-width: 0;
   border: 1px solid #263241;
   border-radius: 7px;
@@ -128,7 +158,8 @@ button {
 }
 
 .status-strip span,
-.live-grid span {
+.live-grid span,
+.policy-grid span {
   display: block;
   color: var(--muted);
   font-size: 10px;
@@ -137,7 +168,8 @@ button {
 }
 
 .status-strip strong,
-.live-grid strong {
+.live-grid strong,
+.policy-grid strong {
   display: block;
   margin-top: 4px;
   color: var(--text);
@@ -225,6 +257,17 @@ button {
   gap: 8px;
 }
 
+.policy-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.policy-grid strong {
+  color: var(--teal);
+  font-size: 13px;
+}
+
 .csv-panel {
   display: grid;
   gap: 8px;
@@ -268,7 +311,8 @@ button {
   }
 
   .status-strip,
-  .live-grid {
+  .live-grid,
+  .policy-grid {
     grid-template-columns: 1fr;
   }
 }

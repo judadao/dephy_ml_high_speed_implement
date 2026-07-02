@@ -1,19 +1,22 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Pause, Play, RotateCcw } from "lucide-react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import "./styles.css";
 
-const KEYFRAME_CSV = `frame_id,t_ms,x,y,z,yaw,pitch,roll,grip,hold_ms,tolerance,safety_hold
-open_start,0,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0,0.012,0
-half_close,300,0.10,0.04,0.02,0.18,-0.06,0.08,0.45,0,0.012,0
-closed_reach,600,0.22,0.08,0.04,0.28,-0.12,0.14,1.00,0,0.012,0
-half_open,900,0.10,0.02,0.00,0.10,-0.04,0.06,0.35,0,0.012,0
-open_return,1200,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0,0.012,0`;
-
+const KEYFRAME_URL = "/demo/hand_keyframes.csv";
+const POLICY_URL = "/demo/hand_policy.json";
 const RENDER_MS = 16;
 const ANCHOR_MS = 300;
+const DEFAULT_POLICY = {
+  format: "dephy_hand_policy_v1",
+  kp_pos: 8.5,
+  kd_pos: 2.1,
+  kp_rot: 3.2,
+  kp_grip: 4.0,
+  speed_scale: 0.82,
+};
 const FINGER_JOINTS = ["metacarpal", "mcp", "pip", "dip", "tip"];
 const FINGERS = [
   { name: "thumb", base: [-0.31, -0.07, 0.045], spread: -0.42, length: [0.07, 0.13, 0.12, 0.095, 0.055], angle: -0.72, curlBias: 1.2 },
@@ -78,11 +81,12 @@ function errorToTarget(state, target) {
   return pos + rot + grip;
 }
 
-function stepPredictor(state, target) {
+function stepPredictor(state, target, policy) {
   const dt = RENDER_MS / 1000;
-  const kp = 8.5;
-  const kd = 2.1;
-  const maxSpeed = 1.25;
+  const kp = policy.kp_pos || DEFAULT_POLICY.kp_pos;
+  const kd = policy.kd_pos || DEFAULT_POLICY.kd_pos;
+  const speedScale = clamp(policy.speed_scale || DEFAULT_POLICY.speed_scale, 0.05, 1);
+  const maxSpeed = 1.25 * speedScale;
   const maxAccel = 6.5;
   let desiredVx = (target.x - state.x) * kp - state.vx * kd;
   let desiredVy = (target.y - state.y) * kp - state.vy * kd;
@@ -114,10 +118,10 @@ function stepPredictor(state, target) {
     x: state.x + vx * dt,
     y: state.y + vy * dt,
     z: state.z + vz * dt,
-    yaw: state.yaw + clamp(target.yaw - state.yaw, -3.2 * dt, 3.2 * dt),
-    pitch: state.pitch + clamp(target.pitch - state.pitch, -3.2 * dt, 3.2 * dt),
-    roll: state.roll + clamp(target.roll - state.roll, -3.2 * dt, 3.2 * dt),
-    grip: clamp(state.grip + clamp(target.grip - state.grip, -4.0 * dt, 4.0 * dt), 0, 1),
+    yaw: state.yaw + clamp((target.yaw - state.yaw) * (policy.kp_rot || DEFAULT_POLICY.kp_rot), -3.2 * dt * speedScale, 3.2 * dt * speedScale),
+    pitch: state.pitch + clamp((target.pitch - state.pitch) * (policy.kp_rot || DEFAULT_POLICY.kp_rot), -3.2 * dt * speedScale, 3.2 * dt * speedScale),
+    roll: state.roll + clamp((target.roll - state.roll) * (policy.kp_rot || DEFAULT_POLICY.kp_rot), -3.2 * dt * speedScale, 3.2 * dt * speedScale),
+    grip: clamp(state.grip + clamp((target.grip - state.grip) * (policy.kp_grip || DEFAULT_POLICY.kp_grip), -4.0 * dt * speedScale, 4.0 * dt * speedScale), 0, 1),
     vx,
     vy,
     vz,
@@ -275,14 +279,55 @@ function applyHandFrame(parts, frame) {
 
 function App() {
   const mountRef = useRef(null);
-  const keyframes = useMemo(() => parseCsv(KEYFRAME_CSV), []);
-  const frameRef = useRef(initialState(keyframes[0]));
+  const [keyframeCsv, setKeyframeCsv] = useState("");
+  const [keyframes, setKeyframes] = useState([]);
+  const [policy, setPolicy] = useState(DEFAULT_POLICY);
+  const [dataStatus, setDataStatus] = useState("loading");
+  const frameRef = useRef(null);
   const [frame, setFrame] = useState(frameRef.current);
   const [running, setRunning] = useState(true);
   const [renderError, setRenderError] = useState("");
 
   useEffect(() => {
-    if (!running) {
+    let cancelled = false;
+    Promise.all([
+      fetch(KEYFRAME_URL).then((response) => {
+        if (!response.ok) {
+          throw new Error(KEYFRAME_URL);
+        }
+        return response.text();
+      }),
+      fetch(POLICY_URL).then((response) => {
+        if (!response.ok) {
+          throw new Error(POLICY_URL);
+        }
+        return response.json();
+      }),
+    ])
+      .then(([csv, loadedPolicy]) => {
+        if (cancelled) {
+          return;
+        }
+        const loadedKeyframes = parseCsv(csv);
+        setKeyframeCsv(csv);
+        setKeyframes(loadedKeyframes);
+        setPolicy({ ...DEFAULT_POLICY, ...loadedPolicy });
+        frameRef.current = initialState(loadedKeyframes[0]);
+        setFrame(frameRef.current);
+        setDataStatus("loaded");
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDataStatus("load error");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!running || keyframes.length === 0 || !frameRef.current) {
       return undefined;
     }
     const timer = window.setInterval(() => {
@@ -291,7 +336,7 @@ function App() {
       const targetIndex = (anchorStep % (keyframes.length - 1)) + 1;
       const anchorLoop = Math.floor(anchorStep / (keyframes.length - 1)) + 1;
       const target = keyframes[targetIndex];
-      let next = stepPredictor({ ...current, targetIndex, anchorLoop }, target);
+      let next = stepPredictor({ ...current, targetIndex, anchorLoop }, target, policy);
       next.targetIndex = targetIndex;
       next.csvLine = targetIndex + 1;
       next.anchorLoop = anchorLoop;
@@ -303,10 +348,14 @@ function App() {
       setFrame(next);
     }, RENDER_MS);
     return () => window.clearInterval(timer);
-  }, [keyframes, running]);
+  }, [keyframes, policy, running]);
 
   useEffect(() => {
     const mount = mountRef.current;
+    if (!mount || !frameRef.current) {
+      return undefined;
+    }
+
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
     let renderer;
@@ -369,16 +418,33 @@ function App() {
       renderer.dispose();
       mount.removeChild(renderer.domElement);
     };
-  }, []);
+  }, [frame !== null]);
 
   function resetDemo() {
+    if (keyframes.length === 0) {
+      return;
+    }
     frameRef.current = initialState(keyframes[0]);
     setFrame(frameRef.current);
   }
 
+  if (!frame || keyframes.length === 0) {
+    return (
+      <main className="app-shell">
+        <section className="hero">
+          <div>
+            <p>single palm keyframes / loaded device stream / loaded prediction policy</p>
+            <h1>Hand Prediction Demo</h1>
+          </div>
+        </section>
+        <section className="loading-state">{dataStatus}</section>
+      </main>
+    );
+  }
+
   const target = keyframes[frame.targetIndex] || keyframes[0];
   const predictedGap = Math.floor(ANCHOR_MS / RENDER_MS);
-  const csvRows = KEYFRAME_CSV.trim().split(/\r?\n/);
+  const csvRows = keyframeCsv.trim().split(/\r?\n/);
   const liveRows = [
     ["frame_t_ms", frame.frame_t_ms],
     ["target", target.frame_id],
@@ -395,12 +461,20 @@ function App() {
     ["error", frame.error.toFixed(4)],
     ["confidence", frame.confidence.toFixed(3)],
   ];
+  const policyRows = [
+    ["policy", policy.format],
+    ["kp_pos", Number(policy.kp_pos).toFixed(2)],
+    ["kd_pos", Number(policy.kd_pos).toFixed(2)],
+    ["kp_rot", Number(policy.kp_rot).toFixed(2)],
+    ["kp_grip", Number(policy.kp_grip).toFixed(2)],
+    ["speed", Number(policy.speed_scale).toFixed(2)],
+  ];
 
   return (
     <main className="app-shell">
       <section className="hero">
         <div>
-          <p>single palm keyframes / 300ms device anchors / 16ms predicted frames</p>
+          <p>single palm keyframes / loaded device stream / loaded prediction policy</p>
           <h1>Hand Prediction Demo</h1>
         </div>
         <div className="hero-actions">
@@ -434,6 +508,11 @@ function App() {
             </div>
           </div>
 
+          <div className="source-strip">
+            <span>{KEYFRAME_URL}</span>
+            <span>{POLICY_URL}</span>
+          </div>
+
           <div className="timeline">
             <div className="timeline-head">
               <span>keyframe script</span>
@@ -452,6 +531,15 @@ function App() {
 
           <div className="live-grid">
             {liveRows.map(([label, value]) => (
+              <div key={label}>
+                <span>{label}</span>
+                <strong>{value}</strong>
+              </div>
+            ))}
+          </div>
+
+          <div className="policy-grid">
+            {policyRows.map(([label, value]) => (
               <div key={label}>
                 <span>{label}</span>
                 <strong>{value}</strong>

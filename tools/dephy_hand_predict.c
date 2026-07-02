@@ -45,7 +45,7 @@ static int parse_f32(const char *text, float *out)
 static void usage(const char *argv0)
 {
     fprintf(stderr,
-            "usage: %s --keyframes FILE [--policy FILE] [--render-ms 16] [--max-speed N] [--max-accel N]\n",
+            "usage: %s (--keyframes FILE|--from-hand-stream FILE) [--policy FILE] [--render-ms 16] [--max-speed N] [--max-accel N]\n",
             argv0);
 }
 
@@ -166,6 +166,75 @@ static int parse_keyframe_line(char *line, dephy_hand_keyframe_t *keyframe)
     return 0;
 }
 
+static int json_find_string(const char *json, const char *key, char *out, size_t out_size)
+{
+    char pattern[64];
+    const char *pos;
+    const char *end;
+    size_t len;
+
+    if (!json || !key || !out || out_size == 0) {
+        return -1;
+    }
+    if (snprintf(pattern, sizeof(pattern), "\"%s\":\"", key) >= (int)sizeof(pattern)) {
+        return -1;
+    }
+    pos = strstr(json, pattern);
+    if (!pos) {
+        return -1;
+    }
+    pos += strlen(pattern);
+    end = strchr(pos, '"');
+    if (!end) {
+        return -1;
+    }
+    len = (size_t)(end - pos);
+    if (len >= out_size) {
+        len = out_size - 1;
+    }
+    memcpy(out, pos, len);
+    out[len] = '\0';
+    return 0;
+}
+
+static int json_find_u32(const char *json, const char *key, uint32_t *out)
+{
+    float value;
+
+    if (!out || json_find_f32(json, key, &value) != 0 || value < 0.0f || value > 1000000.0f) {
+        return -1;
+    }
+    *out = (uint32_t)value;
+    return 0;
+}
+
+static int parse_hand_stream_line(const char *line, dephy_hand_keyframe_t *keyframe)
+{
+    uint32_t temp_u32;
+
+    if (!line || !keyframe || !strstr(line, "\"event\":\"keyframe\"")) {
+        return 1;
+    }
+
+    memset(keyframe, 0, sizeof(*keyframe));
+    if (json_find_string(line, "frame_id", keyframe->frame_id, sizeof(keyframe->frame_id)) != 0 ||
+        json_find_u32(line, "t_ms", &keyframe->t_ms) != 0 ||
+        json_find_f32(line, "x", &keyframe->x) != 0 ||
+        json_find_f32(line, "y", &keyframe->y) != 0 ||
+        json_find_f32(line, "z", &keyframe->z) != 0 ||
+        json_find_f32(line, "yaw", &keyframe->yaw) != 0 ||
+        json_find_f32(line, "pitch", &keyframe->pitch) != 0 ||
+        json_find_f32(line, "roll", &keyframe->roll) != 0 ||
+        json_find_f32(line, "grip", &keyframe->grip) != 0 ||
+        json_find_u32(line, "hold_ms", &keyframe->hold_ms) != 0 ||
+        json_find_f32(line, "tolerance", &keyframe->tolerance) != 0 ||
+        json_find_u32(line, "safety_hold", &temp_u32) != 0) {
+        return -1;
+    }
+    keyframe->safety_hold = temp_u32 ? 1 : 0;
+    return 0;
+}
+
 static int load_keyframes(const char *path, dephy_hand_keyframe_t *frames, size_t *count)
 {
     FILE *fp;
@@ -185,6 +254,41 @@ static int load_keyframes(const char *path, dephy_hand_keyframe_t *frames, size_
     while (fgets(line, sizeof(line), fp)) {
         dephy_hand_keyframe_t keyframe;
         int parsed = parse_keyframe_line(line, &keyframe);
+
+        if (parsed == 1) {
+            continue;
+        }
+        if (parsed != 0 || frame_count >= DEPHY_HAND_MAX_KEYFRAMES) {
+            fclose(fp);
+            return -1;
+        }
+        frames[frame_count++] = keyframe;
+    }
+
+    fclose(fp);
+    *count = frame_count;
+    return frame_count >= 1 ? 0 : -1;
+}
+
+static int load_keyframes_from_stream(const char *path, dephy_hand_keyframe_t *frames, size_t *count)
+{
+    FILE *fp;
+    char line[1024];
+    size_t frame_count = 0;
+
+    if (!path || !frames || !count) {
+        return -1;
+    }
+
+    fp = fopen(path, "r");
+    if (!fp) {
+        perror(path);
+        return -1;
+    }
+
+    while (fgets(line, sizeof(line), fp)) {
+        dephy_hand_keyframe_t keyframe;
+        int parsed = parse_hand_stream_line(line, &keyframe);
 
         if (parsed == 1) {
             continue;
@@ -228,6 +332,7 @@ int main(int argc, char **argv)
     dephy_hand_keyframe_t keyframes[DEPHY_HAND_MAX_KEYFRAMES];
     dephy_hand_state_t state;
     const char *keyframe_path = 0;
+    const char *hand_stream_path = 0;
     const char *policy_path = 0;
     size_t keyframe_count = 0;
     size_t target_index;
@@ -236,6 +341,8 @@ int main(int argc, char **argv)
     for (i = 1; i < argc; ++i) {
         if (strcmp(argv[i], "--keyframes") == 0 && i + 1 < argc) {
             keyframe_path = argv[++i];
+        } else if (strcmp(argv[i], "--from-hand-stream") == 0 && i + 1 < argc) {
+            hand_stream_path = argv[++i];
         } else if (strcmp(argv[i], "--policy") == 0 && i + 1 < argc) {
             policy_path = argv[++i];
         } else if (strcmp(argv[i], "--render-ms") == 0 && i + 1 < argc) {
@@ -259,7 +366,19 @@ int main(int argc, char **argv)
         }
     }
 
-    if (!keyframe_path || load_keyframes(keyframe_path, keyframes, &keyframe_count) != 0) {
+    if (keyframe_path && hand_stream_path) {
+        usage(argv[0]);
+        return 2;
+    }
+    if (keyframe_path && load_keyframes(keyframe_path, keyframes, &keyframe_count) != 0) {
+        usage(argv[0]);
+        return 2;
+    }
+    if (hand_stream_path && load_keyframes_from_stream(hand_stream_path, keyframes, &keyframe_count) != 0) {
+        usage(argv[0]);
+        return 2;
+    }
+    if (!keyframe_path && !hand_stream_path) {
         usage(argv[0]);
         return 2;
     }

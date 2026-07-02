@@ -9,8 +9,8 @@ fi
 out_dir="${OUTDIR:-build_out}/web-render"
 mkdir -p "$out_dir"
 
-google-chrome \
-    --headless \
+timeout 20s google-chrome \
+    --headless=new \
     --disable-gpu \
     --no-sandbox \
     --use-gl=swiftshader \

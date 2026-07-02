@@ -37,3 +37,20 @@ recovery_out="${OUTDIR:-build_out}/hand_overshoot_recovery.csv"
     --max-accel 8.0 > "$recovery_out"
 grep -q ',return_precise,' "$recovery_out"
 tail -n 1 "$recovery_out" | awk -F, '{ if ($15 != "1") exit 1; if ($3 < 0.24 || $3 > 0.26) exit 1; }'
+
+io_repo="$(pwd)/../linux_io_device_simul"
+if [ -x "$io_repo/build_out/linux_io_device_simul" ]; then
+    stream_out="${OUTDIR:-build_out}/hand_device_stream.out"
+    stream_frames="${OUTDIR:-build_out}/hand_device_stream_frames.csv"
+    "$io_repo/build_out/linux_io_device_simul" \
+        --hand-stream \
+        --loop 1 \
+        --sample-ms 300 \
+        "$io_repo/scripts/hand_keyframe_demo.script" > "$stream_out"
+    "${OUTDIR:-build_out}/dephy_hand_predict" \
+        --from-hand-stream "$stream_out" \
+        --policy web/public/demo/hand_policy.json \
+        --render-ms 16 > "$stream_frames"
+    grep -q ',closed_reach,' "$stream_frames"
+    tail -n 1 "$stream_frames" | awk -F, '{ if ($15 != "1") exit 1; if ($13 > 0.02) exit 1; }'
+fi

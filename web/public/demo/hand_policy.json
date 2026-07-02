@@ -1,0 +1,11 @@
+{
+  "format": "dephy_hand_policy_v1",
+  "kp_pos": 8.5,
+  "kd_pos": 2.1,
+  "kp_rot": 3.2,
+  "kp_grip": 4.0,
+  "speed_scale": 0.82,
+  "training": {
+    "source": "demo fixture exported from offline hand policy trainer"
+  }
+}

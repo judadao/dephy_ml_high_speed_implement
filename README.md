@@ -108,9 +108,32 @@ make -f Makefile.linux web
 
 Then open `http://127.0.0.1:8091/`.
 
-The demo is browser-side only: it uses embedded CSV keyframes to simulate the
+The demo is browser-side only: it loads CSV keyframe fixtures that mirror the
 device loop, then applies the same bounded prediction idea to update palm
 position, rotation, grip, error, confidence, and target keyframe data live.
+
+The active demo data is loaded from external fixtures instead of being hardcoded
+inside React:
+
+- `web/public/demo/hand_keyframes.csv`: keyframe anchors generated from the
+  device-simulator script shape.
+- `web/public/demo/hand_policy.json`: loaded prediction policy parameters.
+
+The intended device-to-implement path is:
+
+```sh
+../linux_io_device_simul/build_out/linux_io_device_simul \
+  --hand-stream \
+  --loop 1 \
+  --sample-ms 300 \
+  ../linux_io_device_simul/scripts/hand_keyframe_demo.script \
+  > build_out/hand_device_stream.out
+
+build_out/dephy_hand_predict \
+  --from-hand-stream build_out/hand_device_stream.out \
+  --policy web/public/demo/hand_policy.json \
+  --render-ms 16 > build_out/hand_device_frames.csv
+```
 
 ## Generate Frames
 
