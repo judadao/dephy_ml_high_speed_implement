@@ -113,6 +113,30 @@ items:
   - id: web_realtime_flow_regression
     title: Add realtime web flow regression check for loop startup and current IO display
     status: done
+  - id: web_tab_contracts
+    title: Define Realtime Demo, Prediction, and Anchors tab contracts in code and README
+    status: done
+  - id: web_realtime_state_model
+    title: Keep Realtime Demo state to current runtime IO, current prediction segment, and current prediction row
+    status: done
+  - id: web_realtime_remove_selected_anchor
+    title: Remove selected anchor state from Realtime Demo playback
+    status: done
+  - id: web_data_module
+    title: Split web data parsing and constants out of main.jsx
+    status: done
+  - id: web_hand_scene_module
+    title: Split hand scene rendering out of main.jsx
+    status: done
+  - id: web_tab_panel_components
+    title: Split tab panels into focused components after playback state is stable
+    status: pending
+  - id: web_tab_regression_checks
+    title: Add regression checks for tab contracts and runtime/prediction alignment
+    status: done
+  - id: web_stabilization_verify
+    title: Re-run web build, SSE check, realtime flow check, and restart local tmux demo
+    status: done
   - id: learned_bootstrap_model
     title: Replace lightweight bootstrap prior with fuller learned model
     status: pending_discussion

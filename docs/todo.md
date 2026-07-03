@@ -63,6 +63,17 @@ All initial TODO items are implemented as first-pass, tested building blocks.
 - [x] Simplify web prediction display around the active segment.
 - [x] Add realtime web flow regression check for loop startup and current IO display.
 
+## Web Demo Stabilization TODO
+
+- [x] Define the three tab contracts in code and README: Realtime Demo, Prediction, Anchors.
+- [x] Keep Realtime Demo state to three concepts only: current runtime IO keyframe, current prediction segment, current prediction row.
+- [x] Remove selected anchor state from Realtime Demo playback.
+- [x] Split web data parsing and constants out of `web/src/main.jsx`.
+- [x] Split hand scene rendering out of `web/src/main.jsx`.
+- [ ] Split tab panels into focused components after playback state is stable.
+- [x] Add regression checks for tab labels, current runtime IO order, prediction row display, and runtime/prediction alignment.
+- [x] Re-run web build, SSE check, realtime flow check, and restart the local tmux demo.
+
 ## Pending Model Discussion
 
 - [ ] Replace the lightweight bootstrap prior with a fuller learned model.

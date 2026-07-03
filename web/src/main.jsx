@@ -1,372 +1,12 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ChevronDown, ChevronLeft, ChevronRight, Pause, Play, RotateCcw } from "lucide-react";
-import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { buildHandJoints, FINGER_JOINTS, FINGERS, HAND_SCALE, SCENE_Y_OFFSET } from "./handRig.js";
+import { HandScene } from "./HandScene.jsx";
+import { ANCHOR_MS, DEFAULT_POLICY, KEYFRAME_URL, PLAY_MODES, POLICY_URL, PREDICTION_WINDOW_AFTER, PREDICTION_WINDOW_BEFORE, RENDER_MS, RESULT_URL, RUNTIME_ANCHORS_URL, SAMPLE_KEYFRAME_URL, SEGMENTS_URL, TAB_CONTRACTS, UI_UPDATE_MS } from "./demoConstants.js";
+import { flattenPredictionSegments, formatPredictionCsvRow, frameFromKeyframe, makeFrameState, parseCsv, parsePredictionSegmentsJsonl, parseRuntimeAnchorsJsonl } from "./demoData.js";
 import "./styles.css";
 
-const SAMPLE_KEYFRAME_URL = "/demo/sample_keyframes.csv";
-const KEYFRAME_URL = SAMPLE_KEYFRAME_URL;
-const RUNTIME_ANCHORS_URL = "/demo/runtime_anchors.jsonl";
-const POLICY_URL = "/demo/hand_policy.json";
-const SEGMENTS_URL = "/demo/hand_sequence/prediction_segments.jsonl";
-const RESULT_URL = "/demo/hand_sequence/result.json";
-const RENDER_MS = 16;
-const ANCHOR_MS = 300;
-const UI_UPDATE_MS = 80;
-const PREDICTION_WINDOW_BEFORE = 36;
-const PREDICTION_WINDOW_AFTER = 36;
-const DEFAULT_POLICY = {
-  format: "dephy_hand_policy_v1",
-  kp_pos: 8.5,
-  kd_pos: 2.1,
-  kp_rot: 3.2,
-  kp_grip: 4.0,
-  speed_scale: 0.82,
-};
-
-function parseCsv(text) {
-  if (!text.trim()) {
-    return [];
-  }
-  const [headerLine, ...rows] = text.trim().split(/\r?\n/);
-  const headers = headerLine.split(",");
-  return rows.map((row) => {
-    const values = row.split(",");
-    const item = Object.fromEntries(headers.map((key, index) => [key, values[index]]));
-    return {
-      frame_id: item.frame_id,
-      t_ms: Number(item.t_ms),
-      x: Number(item.x),
-      y: Number(item.y),
-      z: Number(item.z),
-      yaw: Number(item.yaw),
-      pitch: Number(item.pitch),
-      roll: Number(item.roll),
-      grip: Number(item.grip),
-      hold_ms: Number(item.hold_ms),
-      tolerance: Number(item.tolerance),
-      safety_hold: Number(item.safety_hold),
-    };
-  });
-}
-
-function parseRuntimeAnchorsJsonl(text) {
-  return text
-    .trim()
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .map((line) => {
-      const anchor = JSON.parse(line);
-      const pose = anchor.observed_pose || {};
-      return {
-        frame_id: anchor.anchor_id,
-        anchor_id: anchor.anchor_id,
-        t_ms: Number(anchor.t_ms),
-        x: Number(pose.x),
-        y: Number(pose.y),
-        z: Number(pose.z),
-        yaw: Number(pose.yaw),
-        pitch: Number(pose.pitch),
-        roll: Number(pose.roll),
-        grip: Number(pose.grip),
-        confidence: Number(anchor.confidence ?? 0.85),
-        jitter: Number(anchor.jitter ?? 0),
-        source: anchor.source || "runtime_anchor",
-      };
-    });
-}
-
-function initialState(keyframe) {
-  return {
-    frame_t_ms: keyframe.t_ms,
-    targetIndex: 0,
-    x: keyframe.x,
-    y: keyframe.y,
-    z: keyframe.z,
-    yaw: keyframe.yaw,
-    pitch: keyframe.pitch,
-    roll: keyframe.roll,
-    grip: keyframe.grip,
-    vx: 0,
-    vy: 0,
-    vz: 0,
-    error: 0,
-    confidence: 0.95,
-    csvLine: 1,
-    anchorLoop: 1,
-    keyframeLock: true,
-  };
-}
-
-function frameFromKeyframe(keyframe, index = 0) {
-  return {
-    ...initialState(keyframe),
-    targetIndex: index,
-    csvLine: index + 2,
-    target_frame: keyframe.frame_id,
-  };
-}
-
-function segmentEndpoint(value, fallbackId, fallbackMs) {
-  if (value && typeof value === "object") {
-    return {
-      anchor_id: value.anchor_id ?? value.frame_id ?? fallbackId,
-      frame_id: value.frame_id ?? value.anchor_id ?? fallbackId,
-      t_ms: Number(value.t_ms ?? fallbackMs ?? 0),
-      source: value.source ?? "runtime_anchor",
-      target_kind: value.target_kind ?? "observed_anchor",
-      confidence: Number(value.confidence ?? 0.85),
-    };
-  }
-  return { anchor_id: value ?? fallbackId, frame_id: value ?? fallbackId, t_ms: Number(fallbackMs ?? 0), source: "runtime_anchor", target_kind: "observed_anchor", confidence: 0.85 };
-}
-
-function normalizePredictionFrame(frame, segmentType) {
-  return {
-    frame_t_ms: Number(frame.frame_t_ms),
-    target_frame: frame.target_frame,
-    x: Number(frame.palm_x),
-    y: Number(frame.palm_y),
-    z: Number(frame.palm_z),
-    yaw: Number(frame.yaw),
-    pitch: Number(frame.pitch),
-    roll: Number(frame.roll),
-    grip: Number(frame.grip),
-    csvLine: Number(frame.csvLine),
-    segmentType,
-  };
-}
-
-function parsePredictionSegmentsJsonl(text) {
-  return text
-    .trim()
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .map((line, index) => {
-      const segment = JSON.parse(line);
-      const segmentType = segment.segment_type || "confirmed";
-      const frames = (segment.frames || []).map((frame) => normalizePredictionFrame(frame, segmentType));
-      return {
-        key: `${segment.segment_index ?? index}-${segmentType}-${segment.from?.frame_id ?? segment.from}-${segment.to?.frame_id ?? segment.to}`,
-        segmentIndex: Number(segment.segment_index ?? index),
-        segmentType,
-        source: segment.source || "loaded_segments",
-        from: segmentEndpoint(segment.from, `from_${index}`, segment.start_t_ms),
-        to: segmentEndpoint(segment.to, `to_${index}`, segment.target_t_ms),
-        fromAnchor: segmentEndpoint(segment.from_anchor || segment.from, `from_${index}`, segment.start_t_ms),
-        toAnchor: segmentEndpoint(segment.to_anchor || segment.to, `to_${index}`, segment.target_t_ms),
-        targetKind: segment.target_kind || (segment.is_predicted_target ? "predicted_anchor" : "observed_anchor"),
-        confidence: Number(segment.confidence ?? 0.95),
-        isPredictedTarget: Boolean(segment.is_predicted_target),
-        isCorrected: Boolean(segment.is_corrected),
-        framesBetweenKeyframes: Number(segment.frames_between_keyframes ?? Math.max(0, frames.length - 1)),
-        frames,
-        startLine: frames[0]?.csvLine ?? 0,
-        endLine: frames[frames.length - 1]?.csvLine ?? 0,
-      };
-    });
-}
-
-function flattenPredictionSegments(segments) {
-  return segments.flatMap((segment) => segment.frames);
-}
-
-function makeFrameState(nextFrame, previous, sequenceResult) {
-  const dt = previous ? Math.max((nextFrame.frame_t_ms - previous.frame_t_ms) / 1000, 0.001) : RENDER_MS / 1000;
-  return {
-    frame_t_ms: nextFrame.frame_t_ms,
-    targetIndex: 0,
-    x: nextFrame.x,
-    y: nextFrame.y,
-    z: nextFrame.z,
-    yaw: nextFrame.yaw,
-    pitch: nextFrame.pitch,
-    roll: nextFrame.roll,
-    grip: nextFrame.grip,
-    vx: previous ? (nextFrame.x - previous.x) / dt : 0,
-    vy: previous ? (nextFrame.y - previous.y) / dt : 0,
-    vz: previous ? (nextFrame.z - previous.z) / dt : 0,
-    error: sequenceResult?.last_error ?? sequenceResult?.final_error ?? 0,
-    confidence: sequenceResult?.success ? 1 : 0.85,
-    csvLine: nextFrame.csvLine,
-    anchorLoop: 1,
-    target_frame: nextFrame.target_frame,
-    keyframeLock: false,
-  };
-}
-
-function formatPredictionCsvRow(frame) {
-  return [
-    Number(frame.frame_t_ms).toFixed(3).replace(/\.000$/, ""),
-    frame.target_frame,
-    frame.x.toFixed(6),
-    frame.y.toFixed(6),
-    frame.z.toFixed(6),
-    frame.yaw.toFixed(6),
-    frame.pitch.toFixed(6),
-    frame.roll.toFixed(6),
-    frame.grip.toFixed(6),
-  ].join(",");
-}
-
-function makeMaterial(color) {
-  return new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.06 });
-}
-
-function setBoneBetween(mesh, a, b) {
-  const start = new THREE.Vector3(a.x, a.y, a.z);
-  const end = new THREE.Vector3(b.x, b.y, b.z);
-  const length = start.distanceTo(end);
-  mesh.position.copy(start.clone().add(end).multiplyScalar(0.5));
-  mesh.scale.set(1, Math.max(length, 0.001), 1);
-  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), end.clone().sub(start).normalize());
-}
-
-function createHandRig(scene) {
-  const rig = new THREE.Group();
-  const jointMeshes = {};
-  const bones = [];
-  const jointNames = [
-    "wrist",
-    "wrist_left",
-    "wrist_right",
-    "palm",
-    "palm_base_left",
-    "palm_base_right",
-    "palm_left",
-    "palm_right",
-    "palm_top",
-  ];
-  FINGERS.forEach((finger) => FINGER_JOINTS.forEach((joint) => jointNames.push(`${finger.name}_${joint}`)));
-
-  const palmShape = new THREE.Shape();
-  palmShape.moveTo(-0.27, -0.16);
-  palmShape.lineTo(0.27, -0.16);
-  palmShape.lineTo(0.32, 0.08);
-  palmShape.lineTo(0.2, 0.21);
-  palmShape.lineTo(-0.2, 0.21);
-  palmShape.lineTo(-0.32, 0.08);
-  palmShape.lineTo(-0.27, -0.16);
-  const palmMesh = new THREE.Mesh(
-    new THREE.ShapeGeometry(palmShape),
-    new THREE.MeshStandardMaterial({
-      color: 0x2f6fa8,
-      transparent: true,
-      opacity: 0.38,
-      roughness: 0.62,
-      metalness: 0.02,
-      side: THREE.DoubleSide,
-    })
-  );
-  palmMesh.position.z = -0.025;
-  palmMesh.receiveShadow = true;
-  rig.add(palmMesh);
-
-  jointNames.forEach((name) => {
-    const isPalm = name.includes("palm");
-    const isTip = name.endsWith("_tip");
-    const isWrist = name.includes("wrist");
-    const radius = name === "palm" ? 0.07 : isWrist ? 0.052 : isPalm ? 0.043 : isTip ? 0.038 : 0.033;
-    const color = name.includes("thumb") ? 0xf59e0b : isPalm || isWrist ? 0x93c5fd : isTip ? 0x5eead4 : 0x14b8a6;
-    const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 24, 16), makeMaterial(color));
-    mesh.castShadow = true;
-    jointMeshes[name] = mesh;
-    rig.add(mesh);
-  });
-
-  const bonePairs = [
-    ["wrist", "palm"],
-    ["wrist_left", "wrist"],
-    ["wrist", "wrist_right"],
-    ["wrist_left", "palm_base_left"],
-    ["wrist_right", "palm_base_right"],
-    ["palm_base_left", "palm"],
-    ["palm", "palm_base_right"],
-    ["palm_left", "palm"],
-    ["palm", "palm_right"],
-    ["palm_left", "palm_top"],
-    ["palm_top", "palm_right"],
-    ["palm_base_left", "palm_left"],
-    ["palm_base_right", "palm_right"],
-  ];
-  FINGERS.forEach((finger) => {
-    const anchor = finger.name === "thumb" ? "palm_left" : "palm_top";
-    bonePairs.push([anchor, `${finger.name}_metacarpal`]);
-    bonePairs.push([`${finger.name}_metacarpal`, `${finger.name}_mcp`]);
-    bonePairs.push([`${finger.name}_mcp`, `${finger.name}_pip`]);
-    bonePairs.push([`${finger.name}_pip`, `${finger.name}_dip`]);
-    bonePairs.push([`${finger.name}_dip`, `${finger.name}_tip`]);
-  });
-
-  bonePairs.forEach(([from, to]) => {
-    const isPalmBone = from.includes("palm") || from.includes("wrist");
-    const mesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(isPalmBone ? 0.018 : 0.015, isPalmBone ? 0.018 : 0.015, 1, 12),
-      makeMaterial(isPalmBone ? 0x9db9d8 : 0xd8e2ef)
-    );
-    mesh.castShadow = true;
-    bones.push({ from, to, mesh });
-    rig.add(mesh);
-  });
-
-  rig.rotation.x = -0.35;
-  rig.scale.setScalar(HAND_SCALE);
-  scene.add(rig);
-  return { rig, jointMeshes, bones };
-}
-
-function applyHandFrame(parts, frame) {
-  const joints = buildHandJoints(frame);
-  parts.rig.position.set(frame.x * 1.8, frame.y * 1.8 + SCENE_Y_OFFSET, frame.z * 1.8);
-  parts.rig.rotation.set(-0.35 + frame.pitch, frame.yaw, frame.roll);
-  Object.entries(joints).forEach(([name, pose]) => {
-    parts.jointMeshes[name].position.set(pose.x, pose.y, pose.z);
-  });
-  parts.bones.forEach(({ from, to, mesh }) => setBoneBetween(mesh, joints[from], joints[to]));
-}
-
-function HandFallback({ frame }) {
-  const joints = buildHandJoints(frame);
-  const pairs = [
-    ["wrist", "palm"],
-    ["wrist_left", "wrist"],
-    ["wrist", "wrist_right"],
-    ["palm_base_left", "palm"],
-    ["palm", "palm_base_right"],
-    ["palm_left", "palm"],
-    ["palm", "palm_right"],
-    ["palm_left", "palm_top"],
-    ["palm_top", "palm_right"],
-  ];
-  FINGERS.forEach((finger) => {
-    const anchor = finger.name === "thumb" ? "palm_left" : "palm_top";
-    pairs.push([anchor, `${finger.name}_metacarpal`]);
-    pairs.push([`${finger.name}_metacarpal`, `${finger.name}_mcp`]);
-    pairs.push([`${finger.name}_mcp`, `${finger.name}_pip`]);
-    pairs.push([`${finger.name}_pip`, `${finger.name}_dip`]);
-    pairs.push([`${finger.name}_dip`, `${finger.name}_tip`]);
-  });
-  const point = (joint) => `${180 + joint.x * 280},${260 - joint.y * 280 - joint.z * 100}`;
-
-  return (
-    <div className="fallback-hand">
-      <svg viewBox="0 0 360 360" role="img" aria-label="hand fallback">
-        {pairs.map(([from, to]) => (
-          <line key={`${from}-${to}`} x1={point(joints[from]).split(",")[0]} y1={point(joints[from]).split(",")[1]} x2={point(joints[to]).split(",")[0]} y2={point(joints[to]).split(",")[1]} />
-        ))}
-        {Object.entries(joints).map(([name, joint]) => {
-          const [cx, cy] = point(joint).split(",");
-          return <circle key={name} cx={cx} cy={cy} r={name.endsWith("_tip") ? 5 : 4} />;
-        })}
-      </svg>
-    </div>
-  );
-}
-
 function App() {
-  const mountRef = useRef(null);
   const [sampleKeyframes, setSampleKeyframes] = useState([]);
   const [runtimeAnchors, setRuntimeAnchors] = useState([]);
   const [policy, setPolicy] = useState(DEFAULT_POLICY);
@@ -389,9 +29,8 @@ function App() {
   const keyframeIndexRef = useRef(0);
   const keyframeTickRef = useRef(0);
   const [running, setRunning] = useState(true);
-  const [playMode, setPlayMode] = useState("realtime");
+  const [playMode, setPlayMode] = useState(PLAY_MODES.REALTIME);
   const [selectedKeyframeIndex, setSelectedKeyframeIndex] = useState(0);
-  const [renderError, setRenderError] = useState("");
   const [expandedSegments, setExpandedSegments] = useState({});
 
   const keyframes = runtimeAnchors;
@@ -435,7 +74,7 @@ function App() {
     if (isInitialLoad) {
       segmentPlaybackRef.current = { segmentIndex: 0, startTime: performance.now(), lastFrameIndex: -1 };
     }
-    if (isInitialLoad && playMode !== "keyframes" && frames.length > 0) {
+    if (isInitialLoad && playMode !== PLAY_MODES.ANCHORS && frames.length > 0) {
       const first = frames[0];
       frameRef.current = makeFrameState(first, null, null);
       setFrame(frameRef.current);
@@ -567,7 +206,7 @@ function App() {
       return undefined;
     }
     const timer = window.setInterval(() => {
-      if (playMode === "keyframes") {
+      if (playMode === PLAY_MODES.ANCHORS) {
         const now = performance.now();
         if (!running && frameRef.current?.targetIndex === selectedKeyframeIndex) {
           return;
@@ -645,78 +284,6 @@ function App() {
     return () => window.clearInterval(timer);
   }, [keyframes, playMode, policy, running, selectedKeyframeIndex, sequenceFrames, sequenceResult]);
 
-  useEffect(() => {
-    const mount = mountRef.current;
-    if (!mount || !frameRef.current) {
-      return undefined;
-    }
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-    let renderer;
-    let controls;
-    let frameId = 0;
-
-    try {
-      renderer = new THREE.WebGLRenderer({ antialias: true });
-    } catch {
-      setRenderError("WebGL is unavailable in this browser session.");
-      return undefined;
-    }
-
-    scene.background = new THREE.Color(0x0b0f14);
-    camera.position.set(0, 0.04, 5.2);
-    camera.lookAt(0.0, -0.42, 0);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    mount.appendChild(renderer.domElement);
-    controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(0.0, -0.42, 0);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.08;
-    controls.enableZoom = true;
-    controls.zoomSpeed = 1.15;
-    controls.minDistance = 0.7;
-    controls.maxDistance = 8.0;
-
-    const hemi = new THREE.HemisphereLight(0xb7d7ff, 0x111923, 1.7);
-    const key = new THREE.DirectionalLight(0xffffff, 2.4);
-    key.position.set(2.5, 4, 2);
-    key.castShadow = true;
-    scene.add(hemi, key);
-
-    const grid = new THREE.GridHelper(2.4, 12, 0x2f3a48, 0x202a36);
-    grid.rotation.x = Math.PI / 2;
-    grid.position.z = -0.22;
-    scene.add(grid);
-
-    const parts = createHandRig(scene);
-    const resize = () => {
-      const width = mount.clientWidth;
-      const height = mount.clientHeight;
-      renderer.setSize(width, height);
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-    };
-    const animate = () => {
-      applyHandFrame(parts, frameRef.current);
-      controls.update();
-      renderer.render(scene, camera);
-      frameId = requestAnimationFrame(animate);
-    };
-
-    resize();
-    animate();
-    window.addEventListener("resize", resize);
-    return () => {
-      cancelAnimationFrame(frameId);
-      window.removeEventListener("resize", resize);
-      controls.dispose();
-      renderer.dispose();
-      mount.removeChild(renderer.domElement);
-    };
-  }, [frame !== null, keyframes.length > 0]);
-
   function resetDemo() {
     if (keyframes.length === 0) {
       return;
@@ -730,7 +297,7 @@ function App() {
   }
 
   function startPlayback() {
-    if (playMode !== "keyframes") {
+    if (playMode !== PLAY_MODES.ANCHORS) {
       const segments = predictionSegmentsRef.current;
       if (segments.length > 0) {
         const playback = segmentPlaybackRef.current;
@@ -766,7 +333,7 @@ function App() {
     );
     const segment = segments[segmentIndex];
     setRunning(false);
-    setPlayMode(playMode === "realtime" ? "realtime" : "prediction");
+    setPlayMode(PLAY_MODES.PREDICTION);
     setSelectedKeyframeIndex(index);
     keyframeIndexRef.current = index;
     if (segment?.frames.length) {
@@ -784,20 +351,20 @@ function App() {
     if (!keyframes[index]) {
       return;
     }
-    if (playMode !== "keyframes") {
+    if (playMode !== PLAY_MODES.ANCHORS) {
       showPredictionForAnchor(index);
       return;
     }
     setRunning(false);
-    setPlayMode("keyframes");
+    setPlayMode(PLAY_MODES.ANCHORS);
     setSelectedKeyframeIndex(index);
     keyframeIndexRef.current = index;
     frameRef.current = frameFromKeyframe(keyframes[index], index);
     setFrame(frameRef.current);
   }
 
-  const realtimeMode = playMode === "realtime";
-  const sequenceMode = playMode !== "keyframes";
+  const realtimeMode = playMode === PLAY_MODES.REALTIME;
+  const sequenceMode = playMode !== PLAY_MODES.ANCHORS;
   const predictionSegments = sequenceSegments;
 
   useEffect(() => {
@@ -963,9 +530,7 @@ function App() {
       </section>
 
       <section className="stage-row">
-        <div className="stage" ref={mountRef}>
-          {renderError ? <HandFallback frame={frame} /> : null}
-        </div>
+        <HandScene frame={frame} ready={Boolean(frame && keyframes.length > 0)} />
         <aside className="control-panel">
           <div className="status-strip">
             <div>
@@ -989,15 +554,11 @@ function App() {
 
           <div className="playback-panel">
             <div className="mode-toggle" role="group" aria-label="playback mode">
-              <button type="button" className={playMode === "realtime" ? "active" : ""} onClick={() => setPlayMode("realtime")}>
-                Realtime Demo
-              </button>
-              <button type="button" className={playMode === "prediction" ? "active" : ""} onClick={() => setPlayMode("prediction")}>
-                Prediction
-              </button>
-              <button type="button" className={playMode === "keyframes" ? "active" : ""} onClick={() => setPlayMode("keyframes")}>
-                Anchors
-              </button>
+              {TAB_CONTRACTS.map((tab) => (
+                <button type="button" className={playMode === tab.mode ? "active" : ""} onClick={() => setPlayMode(tab.mode)} title={tab.contract} key={tab.mode}>
+                  {tab.label}
+                </button>
+              ))}
             </div>
             {!realtimeMode ? <div className="keyframe-picker">
               <button type="button" onClick={() => showKeyframe((selectedKeyframeIndex - 1 + keyframes.length) % keyframes.length)} title="Previous keyframe">

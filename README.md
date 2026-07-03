@@ -513,18 +513,18 @@ inside React:
 
 The web UI is intentionally split by playback mode:
 
-- `Realtime Demo` mode is the default live demo. It only shows runtime IO
-  anchor that has most recently arrived from the simulated/device IO stream,
-  plus the current prediction segment associated with that anchor. Reference
-  samples are hidden, future anchors are not listed, and queued/future segment
-  rows are not expanded. When the next runtime anchor arrives and implement
-  appends a segment, the displayed current runtime IO row advances to that
-  newly received anchor.
-- `Anchors` mode shows a compact runtime anchor list only. Selecting an anchor
-  pauses playback and hides prediction rows so recorded script review stays
-  simple.
-- `Prediction` mode shows a `current prediction` panel with segment type,
-  from-anchor, to-anchor, target kind, row progress, and confidence.
+- `Realtime Demo` mode is the default live demo. Its contract is exactly:
+  current runtime IO keyframe, current prediction segment, and current
+  prediction row. The current runtime IO is the keyframe currently being
+  processed by prediction/playback, not necessarily the newest IO already
+  appended by the writer. If IO arrives faster than prediction catches up, the
+  panel shows `io lag`.
+- `Prediction` mode is for inspecting generated prediction segments and segment
+  rows. It can show segment type, from-anchor, to-anchor, target kind, row
+  progress, and confidence.
+- `Anchors` mode is for inspecting the runtime IO keyframe list only. Selecting
+  an anchor pauses playback and hides prediction rows so recorded script review
+  stays simple.
 - Runtime anchor rows show queued segment badges, but intermediate prediction
   CSV rows are shown only for the currently active segment. This avoids mixing
   future queued predictions with the live playback state.

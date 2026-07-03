@@ -4,8 +4,10 @@ set -eu
 outdir="${OUTDIR:-build_out}/web_realtime_flow"
 mkdir -p "$outdir"
 
-grep -Fq 'useState("realtime")' web/src/main.jsx
-grep -Fq 'Realtime Demo' web/src/main.jsx
+grep -Fq 'useState(PLAY_MODES.REALTIME)' web/src/main.jsx
+grep -Fq 'Realtime Demo' web/src/demoConstants.js
+grep -Fq 'TAB_CONTRACTS.map' web/src/main.jsx
+grep -Fq 'current runtime IO keyframe + current prediction segment + current prediction row' web/src/demoConstants.js
 grep -Fq 'currentRuntimeAnchorIndex = realtimeMode' web/src/main.jsx
 grep -Fq 'visibleRuntimeAnchors = realtimeMode && currentRuntimeAnchor ? [currentRuntimeAnchor] : keyframes' web/src/main.jsx
 grep -Fq 'current runtime io' web/src/main.jsx
