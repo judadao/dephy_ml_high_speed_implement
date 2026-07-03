@@ -799,9 +799,6 @@ function App() {
   const realtimeMode = playMode === "realtime";
   const sequenceMode = playMode !== "keyframes";
   const predictionSegments = sequenceSegments;
-  const currentRuntimeAnchorIndex = realtimeMode ? Math.max(0, keyframes.length - 1) : selectedKeyframeIndex;
-  const currentRuntimeAnchor = keyframes[currentRuntimeAnchorIndex] || keyframes[0];
-  const visibleRuntimeAnchors = realtimeMode && currentRuntimeAnchor ? [currentRuntimeAnchor] : keyframes;
 
   useEffect(() => {
     const playableSegments = predictionSegments.filter((segment) => segment.frames.length > 0);
@@ -836,22 +833,29 @@ function App() {
         keyframes.findIndex((item, index) => index === frame.targetIndex || item.frame_id === frame.target_frame || item.t_ms === Math.round(frame.frame_t_ms))
       )
     : 0;
-  const realtimeCurrentSegmentIndex = currentRuntimeAnchor
-    ? predictionSegments.findLastIndex(
-        (segment) =>
-          segment.toAnchor.anchor_id === currentRuntimeAnchor.anchor_id ||
-          segment.to.frame_id === currentRuntimeAnchor.frame_id ||
-          segment.fromAnchor.anchor_id === currentRuntimeAnchor.anchor_id
-      )
-    : -1;
   const playbackSegmentIndex = predictionSegments.findIndex((segment) => segment.frames.some((item) => item.csvLine === frame?.csvLine) || segment.to.frame_id === frame?.target_frame);
-  const activeSegmentIndex = Math.max(0, realtimeMode && realtimeCurrentSegmentIndex >= 0 ? realtimeCurrentSegmentIndex : playbackSegmentIndex);
+  const activeSegmentIndex = Math.max(0, playbackSegmentIndex >= 0 ? playbackSegmentIndex : predictionSegments.length - 1);
   const activeSegment = predictionSegments[activeSegmentIndex];
   const rawActiveSegmentFrameIndex = activeSegment ? activeSegment.frames.findIndex((prediction) => prediction.csvLine === frame?.csvLine) : -1;
   const activeSegmentFrameIndex = Math.max(0, rawActiveSegmentFrameIndex);
   const activeSegmentIsPlaying = rawActiveSegmentFrameIndex >= 0;
   const activeSegmentProgress = activeSegment && activeSegment.frames.length > 0 && activeSegmentIsPlaying ? Math.min(100, Math.round(((activeSegmentFrameIndex + 1) / activeSegment.frames.length) * 100)) : 0;
   const keyframeIndexById = useMemo(() => new Map(keyframes.map((item, index) => [item.frame_id, index])), [keyframes]);
+  const currentRuntimeAnchorIndex = realtimeMode
+    ? Math.max(
+        0,
+        keyframes.findIndex(
+          (item) =>
+            item.anchor_id === activeSegment?.toAnchor.anchor_id ||
+            item.frame_id === activeSegment?.to.frame_id ||
+            item.frame_id === frame?.target_frame
+        )
+      )
+    : selectedKeyframeIndex;
+  const currentRuntimeAnchor = keyframes[currentRuntimeAnchorIndex] || keyframes[0];
+  const visibleRuntimeAnchors = realtimeMode && currentRuntimeAnchor ? [currentRuntimeAnchor] : keyframes;
+  const latestReceivedAnchorIndex = Math.max(0, keyframes.length - 1);
+  const predictionLag = realtimeMode ? Math.max(0, latestReceivedAnchorIndex - currentRuntimeAnchorIndex) : 0;
   const activeKeyframeIndex = realtimeMode
     ? currentRuntimeAnchorIndex
     : sequenceMode
@@ -928,8 +932,12 @@ function App() {
         ["grip", currentRuntimeAnchor.grip.toFixed(3)],
         ["confidence", currentRuntimeAnchor.confidence.toFixed(3)],
         ["jitter", currentRuntimeAnchor.jitter.toFixed(5)],
+        ["io lag", predictionLag],
       ]
     : [];
+  const activePredictionWindowStart = activeSegment ? Math.max(0, activeSegmentFrameIndex - PREDICTION_WINDOW_BEFORE) : 0;
+  const activePredictionWindowEnd = activeSegment ? Math.min(activeSegment.frames.length, activeSegmentFrameIndex + PREDICTION_WINDOW_AFTER + 1) : 0;
+  const visibleActivePredictionFrames = activeSegment ? activeSegment.frames.slice(activePredictionWindowStart, activePredictionWindowEnd) : [];
 
   const toggleSegment = (key) => {
     setExpandedSegments((current) => ({ ...current, [key]: !current[key] }));
@@ -1009,6 +1017,27 @@ function App() {
           </div>
 
           {realtimeMode ? (
+            <div className="script-panel">
+              <div className="timeline-head">
+                <span>current runtime io</span>
+                <strong>{currentRuntimeAnchorIndex + 1}/{keyframes.length}</strong>
+              </div>
+              <div className="script-window keyframe-window compact-current">
+                <div className="keyframe-script-group active">
+                  <div className="keyframe active">
+                    <span>{currentRuntimeAnchor.t_ms}</span>
+                    <strong>{currentRuntimeAnchor.frame_id}</strong>
+                    <em>{currentRuntimeAnchor.grip.toFixed(2)}</em>
+                  </div>
+                </div>
+              </div>
+              <div className="window-range">
+                processed by prediction: {currentRuntimeAnchor.frame_id}; latest received: {keyframes[latestReceivedAnchorIndex]?.frame_id ?? "-"}; lag {predictionLag}
+              </div>
+            </div>
+          ) : null}
+
+          {realtimeMode ? (
             <div className="current-prediction">
               <div className="timeline-head">
                 <span>current keyframe from io</span>
@@ -1058,8 +1087,36 @@ function App() {
             </div>
           </div>
 
-          <div className="script-panels">
+          {realtimeMode ? (
             <div className="script-panel">
+              <div className="timeline-head">
+                <span>current prediction rows</span>
+                <strong>{activeSegment && activeSegmentIsPlaying ? `${activeSegmentFrameIndex + 1}/${activeSegment.frames.length}` : "-"}</strong>
+              </div>
+              <div className="predicted-list realtime-prediction-list">
+                <div className="script-row header">
+                  <span>#</span>
+                  <code>{sequenceCsvRows[0] || "frame_t_ms,target_frame,palm_x,palm_y,palm_z,yaw,pitch,roll,grip"}</code>
+                </div>
+                {visibleActivePredictionFrames.map((prediction) => {
+                  const predictionRow = sequenceCsvRows[prediction.csvLine - 1] || "";
+                  const isActivePrediction = prediction.csvLine === frame.csvLine;
+                  return (
+                    <div className={isActivePrediction ? "script-row prediction-row active" : "script-row prediction-row"} key={`${prediction.csvLine}-${prediction.frame_t_ms}`}>
+                      <span>{prediction.csvLine}</span>
+                      <code>{predictionRow}</code>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="window-range">
+                segment {predictionSegments.length ? activeSegmentIndex + 1 : 0}/{predictionSegments.length}: {activeSegment?.segmentType ?? "-"} {activeSegment?.from.frame_id ?? "-"} - {activeSegment?.to.frame_id ?? "-"}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="script-panels">
+            {!realtimeMode ? <div className="script-panel">
               <div className="timeline-head">
                 <span>{realtimeMode ? "current runtime io" : "runtime io anchors"}</span>
                 <strong>
@@ -1135,7 +1192,7 @@ function App() {
               <div className="window-range">
                 segment {predictionSegments.length ? activeSegmentIndex + 1 : 0}/{predictionSegments.length}: {activeSegment?.segmentType ?? "-"} {activeSegment?.from.frame_id ?? "-"} - {activeSegment?.to.frame_id ?? "-"}
               </div>
-            </div>
+            </div> : null}
             {!realtimeMode ? <div className="script-panel">
               <div className="timeline-head">
                 <span>reference samples</span>

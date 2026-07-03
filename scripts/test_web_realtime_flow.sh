@@ -6,11 +6,13 @@ mkdir -p "$outdir"
 
 grep -Fq 'useState("realtime")' web/src/main.jsx
 grep -Fq 'Realtime Demo' web/src/main.jsx
-grep -Fq 'currentRuntimeAnchorIndex = realtimeMode ? Math.max(0, keyframes.length - 1)' web/src/main.jsx
+grep -Fq 'currentRuntimeAnchorIndex = realtimeMode' web/src/main.jsx
 grep -Fq 'visibleRuntimeAnchors = realtimeMode && currentRuntimeAnchor ? [currentRuntimeAnchor] : keyframes' web/src/main.jsx
 grep -Fq 'current runtime io' web/src/main.jsx
 grep -Fq 'current keyframe from io' web/src/main.jsx
 grep -Fq 'prediction for current keyframe' web/src/main.jsx
+grep -Fq 'current prediction rows' web/src/main.jsx
+grep -Fq 'predictionLag' web/src/main.jsx
 grep -Fq 'segment.toAnchor.anchor_id === item.anchor_id' web/src/main.jsx
 grep -Fq 'segmentPlaybackRef.current = { segmentIndex: latestIndex' web/src/main.jsx
 

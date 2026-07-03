@@ -494,6 +494,10 @@ button.keyframe {
   max-height: 260px;
 }
 
+.compact-current {
+  max-height: 58px;
+}
+
 .prediction-window {
   max-height: 242px;
 }
@@ -634,6 +638,16 @@ button.script-row:not(:disabled) {
 .prediction-window .predicted-list,
 .keyframe-prediction-block .predicted-list {
   padding: 0 0 6px 18px;
+}
+
+.realtime-prediction-list {
+  max-height: 220px;
+  overflow: auto;
+  overflow-anchor: none;
+  padding: 0;
+  border: 1px solid #263241;
+  border-radius: 7px;
+  background: #0b1118;
 }
 
 .prediction-window .predicted-list .script-row,
