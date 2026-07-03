@@ -9,6 +9,10 @@ grep -Fq 'Realtime Demo' web/src/main.jsx
 grep -Fq 'currentRuntimeAnchorIndex = realtimeMode ? Math.max(0, keyframes.length - 1)' web/src/main.jsx
 grep -Fq 'visibleRuntimeAnchors = realtimeMode && currentRuntimeAnchor ? [currentRuntimeAnchor] : keyframes' web/src/main.jsx
 grep -Fq 'current runtime io' web/src/main.jsx
+grep -Fq 'current keyframe from io' web/src/main.jsx
+grep -Fq 'prediction for current keyframe' web/src/main.jsx
+grep -Fq 'segment.toAnchor.anchor_id === item.anchor_id' web/src/main.jsx
+grep -Fq 'segmentPlaybackRef.current = { segmentIndex: latestIndex' web/src/main.jsx
 
 make -n -f Makefile.linux web-realtime-demo KEYFRAME_COUNT=5 > "$outdir/make_web_realtime_demo.txt"
 grep -q 'run_hand_runtime_loop_demo.sh' "$outdir/make_web_realtime_demo.txt"

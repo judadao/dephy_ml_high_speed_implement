@@ -811,6 +811,12 @@ function App() {
     if (playableSegments.length === 0) {
       return;
     }
+    if (realtimeMode && playableSegments.length > previousCount) {
+      const latestIndex = playableSegments.length - 1;
+      segmentPlaybackRef.current = { segmentIndex: latestIndex, startTime: performance.now(), lastFrameIndex: -1 };
+      setExpandedSegments({ [playableSegments[latestIndex].key]: true });
+      return;
+    }
     if (playableSegments.length > previousCount && previousCount > 0) {
       const playback = segmentPlaybackRef.current;
       const currentSegment = playableSegments[playback.segmentIndex];
@@ -822,7 +828,7 @@ function App() {
     if (segmentPlaybackRef.current.segmentIndex >= playableSegments.length) {
       segmentPlaybackRef.current = { segmentIndex: 0, startTime: performance.now(), lastFrameIndex: -1 };
     }
-  }, [predictionSegments]);
+  }, [predictionSegments, realtimeMode]);
 
   const frameKeyframeIndex = frame
     ? Math.max(
@@ -841,8 +847,10 @@ function App() {
   const playbackSegmentIndex = predictionSegments.findIndex((segment) => segment.frames.some((item) => item.csvLine === frame?.csvLine) || segment.to.frame_id === frame?.target_frame);
   const activeSegmentIndex = Math.max(0, realtimeMode && realtimeCurrentSegmentIndex >= 0 ? realtimeCurrentSegmentIndex : playbackSegmentIndex);
   const activeSegment = predictionSegments[activeSegmentIndex];
-  const activeSegmentFrameIndex = activeSegment ? Math.max(0, activeSegment.frames.findIndex((prediction) => prediction.csvLine === frame?.csvLine)) : 0;
-  const activeSegmentProgress = activeSegment && activeSegment.frames.length > 0 ? Math.min(100, Math.round(((activeSegmentFrameIndex + 1) / activeSegment.frames.length) * 100)) : 0;
+  const rawActiveSegmentFrameIndex = activeSegment ? activeSegment.frames.findIndex((prediction) => prediction.csvLine === frame?.csvLine) : -1;
+  const activeSegmentFrameIndex = Math.max(0, rawActiveSegmentFrameIndex);
+  const activeSegmentIsPlaying = rawActiveSegmentFrameIndex >= 0;
+  const activeSegmentProgress = activeSegment && activeSegment.frames.length > 0 && activeSegmentIsPlaying ? Math.min(100, Math.round(((activeSegmentFrameIndex + 1) / activeSegment.frames.length) * 100)) : 0;
   const keyframeIndexById = useMemo(() => new Map(keyframes.map((item, index) => [item.frame_id, index])), [keyframes]);
   const activeKeyframeIndex = realtimeMode
     ? currentRuntimeAnchorIndex
@@ -912,6 +920,16 @@ function App() {
     ["error", Number(sequenceResult?.last_error ?? frame.error).toFixed(5)],
     ["jump", Number(sequenceResult?.max_position_jump ?? Math.hypot(frame.vx, frame.vy, frame.vz)).toFixed(4)],
   ];
+  const currentRuntimeRows = currentRuntimeAnchor
+    ? [
+        ["anchor", currentRuntimeAnchor.anchor_id || currentRuntimeAnchor.frame_id],
+        ["t_ms", currentRuntimeAnchor.t_ms],
+        ["source", currentRuntimeAnchor.source],
+        ["grip", currentRuntimeAnchor.grip.toFixed(3)],
+        ["confidence", currentRuntimeAnchor.confidence.toFixed(3)],
+        ["jitter", currentRuntimeAnchor.jitter.toFixed(5)],
+      ]
+    : [];
 
   const toggleSegment = (key) => {
     setExpandedSegments((current) => ({ ...current, [key]: !current[key] }));
@@ -990,9 +1008,26 @@ function App() {
             </div> : null}
           </div>
 
+          {realtimeMode ? (
+            <div className="current-prediction">
+              <div className="timeline-head">
+                <span>current keyframe from io</span>
+                <strong>{currentRuntimeAnchorIndex + 1}/{keyframes.length}</strong>
+              </div>
+              <div className="prediction-summary">
+                {currentRuntimeRows.map(([label, value]) => (
+                  <div key={label}>
+                    <span>{label}</span>
+                    <strong>{value}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           <div className="current-prediction">
             <div className="timeline-head">
-              <span>current prediction</span>
+              <span>{realtimeMode ? "prediction for current keyframe" : "current prediction"}</span>
               <strong>{activeSegment ? `${activeSegmentProgress}%` : "-"}</strong>
             </div>
             <div className="prediction-summary">
@@ -1014,7 +1049,7 @@ function App() {
               </div>
               <div>
                 <span>row</span>
-                <strong>{activeSegment ? `${activeSegmentFrameIndex + 1}/${activeSegment.frames.length}` : "-"}</strong>
+                <strong>{activeSegment && activeSegmentIsPlaying ? `${activeSegmentFrameIndex + 1}/${activeSegment.frames.length}` : activeSegment ? `waiting/${activeSegment.frames.length}` : "-"}</strong>
               </div>
               <div>
                 <span>confidence</span>
@@ -1035,7 +1070,12 @@ function App() {
                 {visibleRuntimeAnchors.map((item) => {
                   const keyframeIndex = keyframes.findIndex((anchor) => anchor.anchor_id === item.anchor_id || anchor.frame_id === item.frame_id);
                   const segmentsForKeyframe = predictionSegments.filter(
-                    (segment) => segment.from.frame_id === item.frame_id || (segment.segmentType === "correction" && segment.to.frame_id === item.frame_id)
+                    (segment) =>
+                      segment.from.frame_id === item.frame_id ||
+                      segment.to.frame_id === item.frame_id ||
+                      segment.fromAnchor.anchor_id === item.anchor_id ||
+                      segment.toAnchor.anchor_id === item.anchor_id ||
+                      (segment.segmentType === "correction" && segment.to.frame_id === item.frame_id)
                   ).filter((segment) => !realtimeMode || segment.segmentIndex === activeSegment?.segmentIndex);
                   const isActive = keyframeIndex === activeKeyframeIndex;
                   return (
