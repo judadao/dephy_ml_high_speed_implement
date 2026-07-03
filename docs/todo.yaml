@@ -10,30 +10,51 @@ items:
     status: done
   - id: cyclic_dataset_generation_rules
     title: Define synthetic positive, negative, and test dataset generation rules
-    status: pending
+    status: done
   - id: cyclic_model_io_contract
     title: Define model input vector, output channels, and 1000-frame tensor format
-    status: pending
+    status: done
   - id: cyclic_training_objective_contract
     title: Define training objectives and negative rejection labels
-    status: pending
+    status: done
   - id: cyclic_runtime_correction_contract
     title: Define runtime correction behavior when new IO arrives
-    status: pending
+    status: done
   - id: cyclic_fail_safe_contract
     title: Define fail-safe and rule-engine behavior for impossible IO or low confidence
-    status: pending
+    status: done
   - id: cyclic_performance_benchmark_contract
     title: Define performance benchmark environment and latency/throughput metrics
-    status: pending
+    status: done
   - id: cyclic_snapshot_schema
-    title: Define snapshot and key-state recording format
-    status: pending
+    title: Define snapshot and key-state data format
+    status: done
+  - id: cyclic_case_metadata_contract
+    title: Define case metadata and IO map format
+    status: done
+  - id: cyclic_result_metrics_contract
+    title: Define result and metrics output format
+    status: done
+  - id: cyclic_layout_contract
+    title: Define planned cyclic IO file and folder layout
+    status: done
   - id: cyclic_synthetic_v1
     title: Implement cyclic_io_synthetic_v1 benchmark cases
     status: pending
   - id: cyclic_dataset_generation
     title: Generate positive, negative, and test datasets following cyclic_io_dataset_design.md
+    status: pending
+  - id: cyclic_case_metadata_parser
+    title: Add case metadata parser and validator
+    status: pending
+  - id: cyclic_snapshot_parser
+    title: Add snapshot parser and validator
+    status: pending
+  - id: cyclic_raw_event_parser
+    title: Add raw cyclic IO event row parser
+    status: pending
+  - id: cyclic_vector_frame_builder
+    title: Add normalized fixed-vector frame builder with analog normalization and missing-value masks
     status: pending
   - id: cyclic_phase_normalization
     title: Implement cycle phase normalization and period detection
@@ -50,11 +71,23 @@ items:
   - id: cyclic_1000_frame_predictor
     title: Generate 1000 phase-normalized IO prediction frames per cycle or transition
     status: pending
+  - id: cyclic_prediction_converter
+    title: Convert normalized prediction vectors to case-specific slot/channel/value records
+    status: pending
+  - id: cyclic_runtime_buffer_correction
+    title: Add runtime prediction buffer correction and re-anchor metadata
+    status: pending
+  - id: cyclic_rule_engine
+    title: Add deterministic fail-safe rule engine for hard, soft, and warning violations
+    status: pending
   - id: cyclic_convergence_validation
     title: Validate noisy runtime IO convergence to target snapshots
     status: pending
   - id: cyclic_inference_benchmark
     title: Benchmark runtime inference latency and prediction throughput
+    status: pending
+  - id: cyclic_result_metrics_writer
+    title: Add result metrics writer for snapshot, phase, smoothness, latency, and accepted/rejected status
     status: pending
   - id: cyclic_io_device_e2e
     title: Add linux_io_device_simul generic IO to cyclic prediction e2e flow

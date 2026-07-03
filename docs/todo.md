@@ -16,22 +16,36 @@ contracts:
 
 - [x] Define the generic IO sample schema draft for `DI`, `DO`, `AI`, `AO`, and `Relay`.
 - [x] Define cycle boundary and phase normalization rules.
-- [ ] Define synthetic dataset generation rules.
-- [ ] Define model input vector, output channels, and 1000-frame tensor format.
-- [ ] Define training objectives and negative rejection labels.
-- [ ] Define runtime correction behavior when new IO arrives.
-- [ ] Define fail-safe and rule-engine behavior for impossible IO or low confidence.
-- [ ] Define performance benchmark environment and latency/throughput metrics.
-- [ ] Define snapshot/key-state recording format and import/export flow.
+- [x] Define synthetic dataset generation rules.
+- [x] Define model input vector, output channels, and 1000-frame tensor format.
+- [x] Define training objectives and negative rejection labels.
+- [x] Define runtime correction behavior when new IO arrives.
+- [x] Define fail-safe and rule-engine behavior for impossible IO or low confidence.
+- [x] Define performance benchmark environment and latency/throughput metrics.
+- [x] Define snapshot/key-state data format.
+- [x] Define case metadata / IO map format.
+- [x] Define result / metrics output format.
+- [x] Define planned cyclic IO file and folder layout.
+
+## Cyclic IO Implementation TODO
+
 - [ ] Implement `cyclic_io_synthetic_v1` benchmark cases.
 - [ ] Generate positive, negative, and test datasets following `cyclic_io_dataset_design.md`.
+- [ ] Add case metadata parser and validator.
+- [ ] Add snapshot parser and validator.
+- [ ] Add raw event row parser for `sample_id,t_ms,cycle_id,phase,io_type,slot,channel,value,status,source`.
+- [ ] Add normalized fixed-vector frame builder with analog normalization and missing-value masks.
 - [ ] Implement cycle phase normalization and cycle-period detection.
 - [ ] Build the few-shot fine-tune dataset format for positive periodic samples.
 - [ ] Add model training targets for phase, snapshot, trajectory, endpoint, smoothness, and noisy convergence losses.
 - [ ] Implement phase + nearest-snapshot estimation for noisy runtime IO.
 - [ ] Implement 1000-frame phase-normalized IO trajectory generation.
+- [ ] Add repository converter from normalized prediction vectors to case-specific slot/channel/value records.
+- [ ] Add runtime prediction buffer correction and re-anchor metadata.
+- [ ] Add deterministic fail-safe/rule engine for hard, soft, and warning violations.
 - [ ] Add convergence validation for noisy runtime IO against target snapshots.
 - [ ] Add performance benchmark for inference latency and prediction throughput.
+- [ ] Add result metrics writer for snapshot, phase, smoothness, latency, and accepted/rejected status.
 - [ ] Add cross-repo flow from `linux_io_device_simul` generic IO samples into the cyclic IO engine.
 
 ## Completed Single Palm Keyframe RL

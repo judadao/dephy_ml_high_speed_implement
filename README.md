@@ -20,6 +20,8 @@ The initial IO schema draft is recorded in
 [`docs/cyclic_io_schema_draft.md`](docs/cyclic_io_schema_draft.md).
 Cycle boundary and phase rules are recorded in
 [`docs/cyclic_io_phase_rules.md`](docs/cyclic_io_phase_rules.md).
+Core dataset/model/runtime contract defaults are recorded in
+[`docs/cyclic_io_core_contracts.md`](docs/cyclic_io_core_contracts.md).
 
 The existing single-palm/hand workflow remains a demo and validation surface,
 not the final product scope. It is useful for visualizing low-rate anchors,
