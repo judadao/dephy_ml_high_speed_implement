@@ -539,6 +539,12 @@ The web code is also split by responsibility so later core prediction changes
 do not require touching the whole page:
 
 - `web/src/main.jsx`: React page composition, state wiring, and mode selection.
+- `web/src/RealtimeDemoTab.jsx`: live IO keyframe and current prediction row UI.
+- `web/src/PredictionTab.jsx`: generated segment inspection and folded rows.
+- `web/src/AnchorsTab.jsx`: raw runtime anchor playback/review UI.
+- `web/src/PlaybackToolbar.jsx`: status strip, source strip, mode tabs, and picker.
+- `web/src/MetricsPanels.jsx`: live frame metrics and policy/result metrics.
+- `web/src/DemoHeader.jsx`: title plus play/reset controls.
 - `web/src/demoTransport.js`: initial fixture fetch and SSE event binding.
 - `web/src/demoConstants.js`: tab contracts, URLs, timing, and display limits.
 - `web/src/demoData.js`: CSV/JSONL parsing and frame normalization.

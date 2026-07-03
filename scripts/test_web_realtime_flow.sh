@@ -6,17 +6,17 @@ mkdir -p "$outdir"
 
 grep -Fq 'useState(PLAY_MODES.REALTIME)' web/src/main.jsx
 grep -Fq 'Realtime Demo' web/src/demoConstants.js
-grep -Fq 'TAB_CONTRACTS.map' web/src/main.jsx
+grep -Fq 'tabContracts.map' web/src/PlaybackToolbar.jsx
 grep -Fq 'current runtime IO keyframe + current prediction segment + current prediction row' web/src/demoConstants.js
 grep -Fq 'currentRuntimeAnchorIndexForDisplay({ realtimeMode' web/src/main.jsx
 grep -Fq 'if (!realtimeMode)' web/src/demoDisplay.js
 grep -Fq 'visibleRuntimeAnchors = realtimeMode && currentRuntimeAnchor ? [currentRuntimeAnchor] : keyframes' web/src/main.jsx
-grep -Fq 'current runtime io' web/src/main.jsx
-grep -Fq 'current keyframe from io' web/src/main.jsx
-grep -Fq 'prediction for current keyframe' web/src/main.jsx
-grep -Fq 'current prediction rows' web/src/main.jsx
+grep -Fq 'current runtime io' web/src/RealtimeDemoTab.jsx
+grep -Fq 'current keyframe from io' web/src/RealtimeDemoTab.jsx
+grep -Fq 'prediction for current keyframe' web/src/RealtimeDemoTab.jsx
+grep -Fq 'current prediction rows' web/src/RealtimeDemoTab.jsx
 grep -Fq 'predictionLag' web/src/main.jsx
-grep -Fq 'segment.toAnchor.anchor_id === item.anchor_id' web/src/main.jsx
+grep -Fq 'segment.toAnchor.anchor_id === item.anchor_id' web/src/PredictionTab.jsx
 grep -Fq 'segmentPlaybackRef.current = { segmentIndex: latestIndex' web/src/main.jsx
 grep -Fq 'VISIBLE_ROW_LIMIT = 15' web/src/demoConstants.js
 grep -Fq 'DEMO_RECORD_LIMIT = 15' web/src/demoConstants.js
@@ -28,7 +28,20 @@ grep -Fq 'parseRuntimeAnchorsJsonl(text, DEMO_RECORD_LIMIT)' web/src/main.jsx
 grep -Fq 'parsePredictionSegmentsJsonl(text, DEMO_RECORD_LIMIT)' web/src/main.jsx
 grep -Fq 'latestPlayableSegmentKeyRef' web/src/main.jsx
 grep -Fq 'latestKey !== previousLatestKey' web/src/main.jsx
-grep -Fq 'formatPredictionCsvRow(prediction)' web/src/main.jsx
+grep -Fq 'formatPredictionCsvRow(prediction)' web/src/RealtimeDemoTab.jsx
+grep -Fq 'formatPredictionCsvRow(prediction)' web/src/PredictionTab.jsx
+grep -Fq 'export function RealtimeDemoTab' web/src/RealtimeDemoTab.jsx
+grep -Fq 'export function PredictionTab' web/src/PredictionTab.jsx
+grep -Fq 'export function AnchorsTab' web/src/AnchorsTab.jsx
+grep -Fq 'export function PlaybackToolbar' web/src/PlaybackToolbar.jsx
+grep -Fq 'export function MetricsPanels' web/src/MetricsPanels.jsx
+grep -Fq 'export function DemoHeader' web/src/DemoHeader.jsx
+grep -Fq 'from "./RealtimeDemoTab.jsx"' web/src/main.jsx
+grep -Fq 'from "./PredictionTab.jsx"' web/src/main.jsx
+grep -Fq 'from "./AnchorsTab.jsx"' web/src/main.jsx
+grep -Fq 'from "./PlaybackToolbar.jsx"' web/src/main.jsx
+grep -Fq 'from "./MetricsPanels.jsx"' web/src/main.jsx
+grep -Fq 'from "./DemoHeader.jsx"' web/src/main.jsx
 grep -Fq 'from "./manualPlayback.js"' web/src/main.jsx
 grep -Fq 'from "./demoDisplay.js"' web/src/main.jsx
 grep -Fq 'from "./playbackTiming.js"' web/src/main.jsx
@@ -42,7 +55,7 @@ grep -Fq 'export function resumePlaybackAtCurrentFrame' web/src/playbackTiming.j
 grep -Fq 'export function fetchInitialDemoData' web/src/demoTransport.js
 grep -Fq 'export function connectDemoEvents' web/src/demoTransport.js
 grep -Fq 'connectDemoEvents({' web/src/main.jsx
-grep -Fq 'switchPlaybackMode(tab.mode)' web/src/main.jsx
+grep -Fq 'switchPlaybackMode(tab.mode)' web/src/PlaybackToolbar.jsx
 grep -Fq 'anchorFrameAt(keyframes, selectedKeyframeIndex)' web/src/main.jsx
 grep -Fq 'advanceAnchorPlayback({' web/src/main.jsx
 grep -Fq 'anchorPlaybackRef' web/src/main.jsx
