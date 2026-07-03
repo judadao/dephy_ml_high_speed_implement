@@ -1,11 +1,29 @@
 # TODO
 
-## Current Scope: Single Palm Keyframe RL
+## Current Scope: Cyclic IO Prediction
 
-The active implementation scope is now coordinate-only single-palm movement.
-The previous full-body/3D rig work is retained as background, but the next
-deliverable is a hand-palm predictor that can make low-rate keyframes behave
-like high-rate data on weak/old hardware.
+The active product direction is now documented in
+[`cyclic_io_prediction_direction.md`](cyclic_io_prediction_direction.md).
+The next deliverable is a generic cyclic IO prediction engine that learns from
+positive periodic IO samples, user-recorded snapshots, and few-shot fine-tune
+data. The model should generate 1000 phase-normalized prediction frames per
+cycle or key transition while keeping runtime inference under the configured
+latency budget.
+
+- [ ] Define the generic IO sample schema for `DI`, `DO`, `AI`, `AO`, and `Relay`.
+- [ ] Define snapshot/key-state recording format and import/export flow.
+- [ ] Implement cycle phase normalization and cycle-period detection.
+- [ ] Build the few-shot fine-tune dataset format for positive periodic samples.
+- [ ] Implement phase + nearest-snapshot estimation for noisy runtime IO.
+- [ ] Implement 1000-frame phase-normalized IO trajectory generation.
+- [ ] Add convergence validation for noisy runtime IO against target snapshots.
+- [ ] Add performance benchmark for inference latency and prediction throughput.
+- [ ] Add cross-repo flow from `linux_io_device_simul` generic IO samples into the cyclic IO engine.
+
+## Completed Single Palm Keyframe RL
+
+The previous coordinate-only single-palm work is retained as a visual demo and
+validation background. It is no longer the final product scope.
 
 - [x] Document the single-palm scope in README: old hardware, low-rate IO/keyframes, high-rate predicted frames.
 - [x] Define hand keyframe data: palm position, rotation, grip, hold time, tolerance, and safety flags.

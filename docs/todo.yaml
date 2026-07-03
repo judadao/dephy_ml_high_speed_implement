@@ -1,4 +1,34 @@
 items:
+  - id: cyclic_io_direction_doc
+    title: Record cyclic IO prediction product direction
+    status: done
+  - id: cyclic_io_schema
+    title: Define generic DI/DO/AI/AO/Relay IO sample schema
+    status: pending
+  - id: cyclic_snapshot_schema
+    title: Define snapshot and key-state recording format
+    status: pending
+  - id: cyclic_phase_normalization
+    title: Implement cycle phase normalization and period detection
+    status: pending
+  - id: cyclic_few_shot_dataset
+    title: Build few-shot fine-tune dataset format from positive periodic samples
+    status: pending
+  - id: cyclic_phase_snapshot_estimator
+    title: Estimate phase and nearest snapshot from noisy runtime IO
+    status: pending
+  - id: cyclic_1000_frame_predictor
+    title: Generate 1000 phase-normalized IO prediction frames per cycle or transition
+    status: pending
+  - id: cyclic_convergence_validation
+    title: Validate noisy runtime IO convergence to target snapshots
+    status: pending
+  - id: cyclic_inference_benchmark
+    title: Benchmark runtime inference latency and prediction throughput
+    status: pending
+  - id: cyclic_io_device_e2e
+    title: Add linux_io_device_simul generic IO to cyclic prediction e2e flow
+    status: pending
   - id: hand_scope_readme
     title: Document single-palm keyframe prediction scope
     status: done

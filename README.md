@@ -1,38 +1,44 @@
 # dephy_ml_high_speed_implement
 
-High-speed bitmap and 3D joint motion implementation for controllable character motion.
+Few-shot fine-tuned cyclic IO prediction for turning slow periodic IO samples
+into dense high-speed trajectories.
 
 ## Current Scope
 
-The active implementation scope is now **single-palm coordinate prediction**.
-The goal is to let old or weak Linux hardware provide low-rate keyframes or IO
-anchors, then have this repo predict the missing high-rate frames between those
-anchors.
+The active product direction is now **cyclic IO prediction**. Users provide
+positive periodic IO samples (`DI`, `DO`, `AI`, `AO`, `Relay`) and record key
+snapshots. The repo learns the cycle phase and snapshot transitions, then
+predicts dense high-speed IO trajectories between slow runtime IO updates.
 
-Users provide keyframes such as palm position, rotation, grip, tolerance, and
-hold time. The predictor reads the current palm state, dynamically adjusts the
-movement direction, generates interpolation frames, and keeps correcting until
-the current keyframe is complete. This phase validates by coordinate data only;
-it does not require 3D rendering.
+The detailed direction is recorded in
+[`docs/cyclic_io_prediction_direction.md`](docs/cyclic_io_prediction_direction.md).
+
+The existing single-palm/hand workflow remains a demo and validation surface,
+not the final product scope. It is useful for visualizing low-rate anchors,
+prediction rows, and smooth trajectory behavior while the generic IO model is
+being built.
 
 The target pattern is:
 
 ```txt
-low-rate keyframes / IO anchors
-  -> deterministic or RL hand policy
-  -> 16ms/33ms predicted palm frames
-  -> CSV/JSONL data for validation
+positive periodic IO sample
+  -> snapshot/key-state recording
+  -> cycle phase normalization
+  -> few-shot fine-tune
+  -> 1000-frame phase-normalized prediction
+  -> convergence and latency validation
 ```
 
 This is meant to make weak hardware behave closer to a high-speed data source
-by filling the missing frames with bounded prediction, not by pretending the
-hardware itself is actually sampling faster.
+by filling the missing IO trajectory with fast prediction, not by pretending
+the hardware itself is actually sampling faster.
 
 ## Existing Paths
 
 The repo also has earlier exploratory paths:
 
 - Generate bitmap or indexed matrix animation frames from the command line.
+- Run the single-palm/hand prediction demo as a visual helper.
 - Consume slow IO samples emitted by `linux_io_device_simul`, convert them into
   a named 3D joint timeline, and predict smooth motion frames between sparse IO
   updates.
@@ -57,7 +63,9 @@ make -f Makefile.linux web
 
 ## Single Palm Keyframe Prediction
 
-Core development does not depend on the web demo. The required artifacts are:
+This is a legacy/demo workflow for visual validation while the generic cyclic
+IO engine is being built. Core cyclic IO development should not depend on the
+web demo. The required artifacts are:
 
 ```txt
 keyframes.csv    input anchors or observed IO samples
@@ -125,7 +133,7 @@ bounded predictor.
 
 ## Recorded Keyframe Workflow
 
-The expected production-like path is:
+The legacy hand-device recording path is:
 
 ```txt
 user IO / device simulator
