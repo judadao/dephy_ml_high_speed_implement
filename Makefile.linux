@@ -12,7 +12,7 @@ KEYFRAME_MODE ?= grasp_can
 LIB := $(OUTDIR)/libdephy_ml_high_speed_implement.a
 OBJS := $(OUTDIR)/src/bitmap_anim.o $(OUTDIR)/src/joint_predictor.o $(OUTDIR)/src/hand_predictor.o
 
-.PHONY: all structure-audit direct-test test hand-rl-check hand-sequence-check io-device-pipeline-check zephyr-metadata demo web-demo-data web-sequence-demo-loop web-install web-build web web-render-check clean
+.PHONY: all structure-audit direct-test test hand-rl-check hand-sequence-check hand-realtime-check io-device-pipeline-check zephyr-metadata demo web-demo-data web-realtime-demo-data web-sequence-demo-loop web-install web-build web web-render-check clean
 
 all: $(LIB) $(OUTDIR)/dephy_bitmap_anim $(OUTDIR)/dephy_joint_replay $(OUTDIR)/dephy_hand_predict
 
@@ -72,6 +72,9 @@ hand-rl-check:
 hand-sequence-check:
 	OUTDIR=$(OUTDIR) sh scripts/test_hand_sequence_model.sh
 
+hand-realtime-check:
+	OUTDIR=$(OUTDIR) sh scripts/test_hand_realtime_watcher.sh
+
 web-sequence-demo-loop:
 	FRAMES=$(FRAMES) KEYFRAME_COUNT=$(KEYFRAME_COUNT) KEYFRAME_MODE=$(KEYFRAME_MODE) NOISE_SCALE=$(NOISE_SCALE) sh scripts/run_hand_sequence_realtime_demo.sh
 
@@ -91,8 +94,14 @@ web-demo-data:
 	if [ ! -f $(OUTDIR)/hand_sequence/model.json ]; then OUTDIR=$(OUTDIR) sh scripts/test_hand_sequence_model.sh >/dev/null; fi
 	python3 scripts/generate_random_hand_keyframes.py --out web/public/demo/hand_keyframes.csv --count $(KEYFRAME_COUNT) --sample-ms 300 --seed $(WEB_SEED) --noise-scale $(NOISE_SCALE) --mode $(KEYFRAME_MODE)
 	node scripts/validate_hand_keyframe_clearance.mjs --keyframes web/public/demo/hand_keyframes.csv --min-clearance 0
-	python3 scripts/dephy_hand_sequence_predict.py --keyframes web/public/demo/hand_keyframes.csv --model $(OUTDIR)/hand_sequence/model.json --out web/public/demo/hand_sequence/prediction.csv --result web/public/demo/hand_sequence/result.json --render-ms 16 --frames $(FRAMES)
-	node scripts/validate_hand_keyframe_clearance.mjs --prediction web/public/demo/hand_sequence/prediction.csv --min-clearance 0
+	python3 scripts/dephy_hand_sequence_segments.py --keyframes web/public/demo/hand_keyframes.csv --model $(OUTDIR)/hand_sequence/model.json --out web/public/demo/hand_sequence/prediction_segments.jsonl --result web/public/demo/hand_sequence/result.json --render-ms 16 --frames $(FRAMES)
+
+web-realtime-demo-data:
+	mkdir -p web/public/demo web/public/demo/hand_sequence
+	cp examples/hand/hand_policy.json web/public/demo/hand_policy.json
+	if [ ! -f $(OUTDIR)/hand_sequence/model.json ]; then OUTDIR=$(OUTDIR) sh scripts/test_hand_sequence_model.sh >/dev/null; fi
+	KEYFRAME_COUNT=$(KEYFRAME_COUNT) SAMPLE_MS=300 WEB_SEED=$(WEB_SEED) NOISE_SCALE=$(NOISE_SCALE) KEYFRAME_MODE=$(KEYFRAME_MODE) LOOP=1 OUTDIR=$(OUTDIR) sh scripts/run_hand_realtime_keyframe_simul.sh web/public/demo/hand_keyframes.csv &
+	python3 scripts/dephy_hand_realtime_watcher.py --keyframes web/public/demo/hand_keyframes.csv --model $(OUTDIR)/hand_sequence/model.json --out web/public/demo/hand_sequence/prediction_segments.jsonl --result web/public/demo/hand_sequence/result.json --render-ms 16 --sample-ms 300 --frames $(FRAMES) --max-keyframes $(KEYFRAME_COUNT) --truncate
 
 web-build: web-demo-data
 	npm --prefix web run build

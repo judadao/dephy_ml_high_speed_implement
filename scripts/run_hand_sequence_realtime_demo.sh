@@ -34,10 +34,10 @@ while :; do
             --mode "$keyframe_mode"
     fi
 
-    python3 scripts/dephy_hand_sequence_predict.py \
+    python3 scripts/dephy_hand_sequence_segments.py \
         --keyframes "$active_keyframes" \
         --model "$model" \
-        --out "$outdir/prediction.csv.tmp" \
+        --out "$outdir/prediction_segments.jsonl.tmp" \
         --result "$outdir/result.json.tmp" \
         --render-ms 16 \
         --frames "$frames"
@@ -64,7 +64,7 @@ PY
     if [ "$random_init" = "1" ]; then
         mv "$active_keyframes" "web/public/demo/hand_keyframes.csv"
     fi
-    mv "$outdir/prediction.csv.tmp" "$outdir/prediction.csv"
+    mv "$outdir/prediction_segments.jsonl.tmp" "$outdir/prediction_segments.jsonl"
     mv "$outdir/result.json.tmp" "$outdir/result.json"
     sleep "$interval"
 done
