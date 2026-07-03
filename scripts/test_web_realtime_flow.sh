@@ -8,7 +8,8 @@ grep -Fq 'useState(PLAY_MODES.REALTIME)' web/src/main.jsx
 grep -Fq 'Realtime Demo' web/src/demoConstants.js
 grep -Fq 'TAB_CONTRACTS.map' web/src/main.jsx
 grep -Fq 'current runtime IO keyframe + current prediction segment + current prediction row' web/src/demoConstants.js
-grep -Fq 'currentRuntimeAnchorIndex = realtimeMode' web/src/main.jsx
+grep -Fq 'currentRuntimeAnchorIndexForDisplay({ realtimeMode' web/src/main.jsx
+grep -Fq 'if (!realtimeMode)' web/src/demoDisplay.js
 grep -Fq 'visibleRuntimeAnchors = realtimeMode && currentRuntimeAnchor ? [currentRuntimeAnchor] : keyframes' web/src/main.jsx
 grep -Fq 'current runtime io' web/src/main.jsx
 grep -Fq 'current keyframe from io' web/src/main.jsx
@@ -28,7 +29,17 @@ grep -Fq 'parsePredictionSegmentsJsonl(text, DEMO_RECORD_LIMIT)' web/src/main.js
 grep -Fq 'latestPlayableSegmentKeyRef' web/src/main.jsx
 grep -Fq 'latestKey !== previousLatestKey' web/src/main.jsx
 grep -Fq 'formatPredictionCsvRow(prediction)' web/src/main.jsx
-grep -Fq 'pausedFrameIndex / segment.frames.length' web/src/main.jsx
+grep -Fq 'from "./manualPlayback.js"' web/src/main.jsx
+grep -Fq 'from "./demoDisplay.js"' web/src/main.jsx
+grep -Fq 'from "./playbackTiming.js"' web/src/main.jsx
+grep -Fq 'export function anchorFrameAt' web/src/manualPlayback.js
+grep -Fq 'export function predictionFrameForAnchor' web/src/manualPlayback.js
+grep -Fq 'export function currentRuntimeAnchorIndexForDisplay' web/src/demoDisplay.js
+grep -Fq 'export function predictionFrameWindow' web/src/demoDisplay.js
+grep -Fq 'export function resumePlaybackAtCurrentFrame' web/src/playbackTiming.js
+grep -Fq 'switchPlaybackMode(tab.mode)' web/src/main.jsx
+grep -Fq 'anchorFrameAt(keyframes, selectedKeyframeIndex)' web/src/main.jsx
+grep -Fq 'pausedFrameIndex / segment.frames.length' web/src/playbackTiming.js
 grep -Fq 'if (playMode === PLAY_MODES.ANCHORS) {' web/src/main.jsx
 grep -Fq 'setRunning(false);' web/src/main.jsx
 if grep -Fq 'const nextIndex = running ? (keyframeIndexRef.current + 1) % keyframes.length : selectedKeyframeIndex;' web/src/main.jsx; then

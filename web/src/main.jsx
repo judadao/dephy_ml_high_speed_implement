@@ -2,8 +2,11 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "re
 import { createRoot } from "react-dom/client";
 import { ChevronDown, ChevronLeft, ChevronRight, Pause, Play, RotateCcw } from "lucide-react";
 import { HandScene } from "./HandScene.jsx";
+import { activeFrameIndexForSegment, activeSegmentIndexForFrame, currentRuntimeAnchorIndexForDisplay, frameKeyframeIndexForDisplay, predictionFrameWindow } from "./demoDisplay.js";
 import { ANCHOR_MS, DEFAULT_POLICY, DEMO_RECORD_LIMIT, KEYFRAME_URL, PLAY_MODES, POLICY_URL, PREDICTION_WINDOW_AFTER, PREDICTION_WINDOW_BEFORE, RENDER_MS, RESULT_URL, RUNTIME_ANCHORS_URL, SAMPLE_KEYFRAME_URL, SEGMENTS_URL, TAB_CONTRACTS, UI_UPDATE_MS, VISIBLE_ROW_LIMIT } from "./demoConstants.js";
 import { flattenPredictionSegments, formatPredictionCsvRow, frameFromKeyframe, makeFrameState, parseCsv, parsePredictionSegmentsJsonl, parseRuntimeAnchorsJsonl } from "./demoData.js";
+import { anchorFrameAt, predictionFrameForAnchor } from "./manualPlayback.js";
+import { resumePlaybackAtCurrentFrame, segmentDurationMs } from "./playbackTiming.js";
 import "./styles.css";
 
 function App() {
@@ -27,8 +30,6 @@ function App() {
   const activeKeyframeRowRef = useRef(null);
   const [frame, setFrame] = useState(frameRef.current);
   const lastUiUpdateRef = useRef(0);
-  const keyframeIndexRef = useRef(0);
-  const keyframeTickRef = useRef(0);
   const [running, setRunning] = useState(true);
   const [playMode, setPlayMode] = useState(PLAY_MODES.REALTIME);
   const [selectedKeyframeIndex, setSelectedKeyframeIndex] = useState(0);
@@ -219,7 +220,7 @@ function App() {
         if (segment.frames.length === 0) {
           return;
         }
-        const segmentDuration = Math.max(1, segment.to.t_ms - segment.from.t_ms || ANCHOR_MS);
+        const segmentDuration = segmentDurationMs(segment);
         let elapsed = now - playback.startTime;
         while (elapsed >= segmentDuration) {
           if (playback.segmentIndex >= segments.length - 1) {
@@ -246,7 +247,7 @@ function App() {
           if (segment.frames.length === 0) {
             return;
           }
-          const nextDuration = Math.max(1, segment.to.t_ms - segment.from.t_ms || ANCHOR_MS);
+          const nextDuration = segmentDurationMs(segment);
           elapsed = overflow;
           if (elapsed < nextDuration) {
             break;
@@ -283,8 +284,6 @@ function App() {
       return;
     }
     frameRef.current = frameFromKeyframe(keyframes[0], 0);
-    keyframeIndexRef.current = 0;
-    keyframeTickRef.current = 0;
     setSelectedKeyframeIndex(0);
     segmentPlaybackRef.current = { segmentIndex: 0, startTime: performance.now(), lastFrameIndex: -1 };
     setFrame(frameRef.current);
@@ -301,14 +300,10 @@ function App() {
         if (isAtEnd) {
           segmentPlaybackRef.current = { segmentIndex: 0, startTime: now, lastFrameIndex: -1 };
         } else {
-          const segmentDuration = Math.max(1, segment.to.t_ms - segment.from.t_ms || ANCHOR_MS);
-          const pausedFrameIndex = Math.max(0, playback.lastFrameIndex);
-          const pausedRatio = segment.frames.length > 0 ? pausedFrameIndex / segment.frames.length : 0;
-          segmentPlaybackRef.current = { ...playback, startTime: now - pausedRatio * segmentDuration };
+          segmentPlaybackRef.current = resumePlaybackAtCurrentFrame({ playback, segment, now });
         }
       }
     }
-    keyframeTickRef.current = 0;
     setRunning(true);
   }
 
@@ -325,24 +320,24 @@ function App() {
       return;
     }
     const segments = predictionSegmentsRef.current;
-    const segmentIndex = Math.max(
-      0,
-      segments.findIndex((segment) => segment.from.frame_id === keyframes[index].frame_id || segment.fromAnchor.anchor_id === keyframes[index].anchor_id)
-    );
-    const segment = segments[segmentIndex];
+    const { segmentIndex, segment, frame: manualFrame } = predictionFrameForAnchor({
+      keyframes,
+      segments,
+      index,
+      previousFrame: frameRef.current,
+      sequenceResult,
+    });
     setRunning(false);
     setPlayMode(PLAY_MODES.PREDICTION);
     setSelectedKeyframeIndex(index);
-    keyframeIndexRef.current = index;
-    if (segment?.frames.length) {
+    if (segmentIndex >= 0 && segment?.frames.length) {
       segmentPlaybackRef.current = { segmentIndex, startTime: performance.now(), lastFrameIndex: 0 };
       setExpandedSegments((current) => ({ ...current, [segment.key]: true }));
-      frameRef.current = makeFrameState(segment.frames[0], frameRef.current, sequenceResult);
-      setFrame(frameRef.current);
-      return;
     }
-    frameRef.current = frameFromKeyframe(keyframes[index], index);
-    setFrame(frameRef.current);
+    if (manualFrame) {
+      frameRef.current = manualFrame;
+      setFrame(frameRef.current);
+    }
   }
 
   function showKeyframe(index) {
@@ -356,9 +351,23 @@ function App() {
     setRunning(false);
     setPlayMode(PLAY_MODES.ANCHORS);
     setSelectedKeyframeIndex(index);
-    keyframeIndexRef.current = index;
-    frameRef.current = frameFromKeyframe(keyframes[index], index);
-    setFrame(frameRef.current);
+    const manualFrame = anchorFrameAt(keyframes, index);
+    if (manualFrame) {
+      frameRef.current = manualFrame;
+      setFrame(frameRef.current);
+    }
+  }
+
+  function switchPlaybackMode(mode) {
+    if (mode === PLAY_MODES.ANCHORS) {
+      setRunning(false);
+      const manualFrame = anchorFrameAt(keyframes, selectedKeyframeIndex);
+      if (manualFrame) {
+        frameRef.current = manualFrame;
+        setFrame(frameRef.current);
+      }
+    }
+    setPlayMode(mode);
   }
 
   const realtimeMode = playMode === PLAY_MODES.REALTIME;
@@ -401,31 +410,13 @@ function App() {
     }
   }, [predictionSegments, realtimeMode, running, sequenceMode, sequenceResult]);
 
-  const frameKeyframeIndex = frame
-    ? Math.max(
-        0,
-        keyframes.findIndex((item, index) => index === frame.targetIndex || item.frame_id === frame.target_frame || item.t_ms === Math.round(frame.frame_t_ms))
-      )
-    : 0;
-  const playbackSegmentIndex = predictionSegments.findIndex((segment) => segment.frames.some((item) => item.csvLine === frame?.csvLine) || segment.to.frame_id === frame?.target_frame);
-  const activeSegmentIndex = Math.max(0, playbackSegmentIndex >= 0 ? playbackSegmentIndex : predictionSegments.length - 1);
+  const frameKeyframeIndex = frameKeyframeIndexForDisplay(keyframes, frame);
+  const activeSegmentIndex = activeSegmentIndexForFrame(predictionSegments, frame);
   const activeSegment = predictionSegments[activeSegmentIndex];
-  const rawActiveSegmentFrameIndex = activeSegment ? activeSegment.frames.findIndex((prediction) => prediction.csvLine === frame?.csvLine) : -1;
-  const activeSegmentFrameIndex = Math.max(0, rawActiveSegmentFrameIndex);
-  const activeSegmentIsPlaying = rawActiveSegmentFrameIndex >= 0;
+  const { index: activeSegmentFrameIndex, isPlaying: activeSegmentIsPlaying } = activeFrameIndexForSegment(activeSegment, frame);
   const activeSegmentProgress = activeSegment && activeSegment.frames.length > 0 && activeSegmentIsPlaying ? Math.min(100, Math.round(((activeSegmentFrameIndex + 1) / activeSegment.frames.length) * 100)) : 0;
   const keyframeIndexById = useMemo(() => new Map(keyframes.map((item, index) => [item.frame_id, index])), [keyframes]);
-  const currentRuntimeAnchorIndex = realtimeMode
-    ? Math.max(
-        0,
-        keyframes.findIndex(
-          (item) =>
-            item.anchor_id === activeSegment?.toAnchor.anchor_id ||
-            item.frame_id === activeSegment?.to.frame_id ||
-            item.frame_id === frame?.target_frame
-        )
-      )
-    : selectedKeyframeIndex;
+  const currentRuntimeAnchorIndex = currentRuntimeAnchorIndexForDisplay({ realtimeMode, keyframes, activeSegment, frame, selectedKeyframeIndex });
   const currentRuntimeAnchor = keyframes[currentRuntimeAnchorIndex] || keyframes[0];
   const visibleRuntimeAnchors = realtimeMode && currentRuntimeAnchor ? [currentRuntimeAnchor] : keyframes;
   const latestReceivedAnchorIndex = Math.max(0, keyframes.length - 1);
@@ -509,9 +500,11 @@ function App() {
         ["io lag", predictionLag],
       ]
     : [];
-  const activePredictionWindowStart = activeSegment ? Math.max(0, activeSegmentFrameIndex - PREDICTION_WINDOW_BEFORE) : 0;
-  const activePredictionWindowEnd = activeSegment ? Math.min(activeSegment.frames.length, activeSegmentFrameIndex + PREDICTION_WINDOW_AFTER + 1) : 0;
-  const visibleActivePredictionFrames = activeSegment ? activeSegment.frames.slice(activePredictionWindowStart, activePredictionWindowEnd) : [];
+  const {
+    start: activePredictionWindowStart,
+    end: activePredictionWindowEnd,
+    frames: visibleActivePredictionFrames,
+  } = predictionFrameWindow(activeSegment, activeSegmentFrameIndex, PREDICTION_WINDOW_BEFORE, PREDICTION_WINDOW_AFTER);
 
   const toggleSegment = (key) => {
     setExpandedSegments((current) => ({ ...current, [key]: !current[key] }));
@@ -566,10 +559,7 @@ function App() {
                   type="button"
                   className={playMode === tab.mode ? "active" : ""}
                   onClick={() => {
-                    if (tab.mode === PLAY_MODES.ANCHORS) {
-                      setRunning(false);
-                    }
-                    setPlayMode(tab.mode);
+                    switchPlaybackMode(tab.mode);
                   }}
                   title={tab.contract}
                   key={tab.mode}
