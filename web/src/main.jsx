@@ -720,8 +720,63 @@ function App() {
     setFrame(frameRef.current);
   }
 
+  function startPlayback() {
+    if (playMode === "prediction") {
+      const segments = predictionSegmentsRef.current;
+      if (segments.length > 0) {
+        const playback = segmentPlaybackRef.current;
+        const segment = segments[playback.segmentIndex] || segments[0];
+        const isAtEnd = segment && playback.lastFrameIndex >= segment.frames.length - 1 && playback.segmentIndex >= segments.length - 1;
+        if (isAtEnd) {
+          segmentPlaybackRef.current = { segmentIndex: 0, startTime: performance.now(), lastFrameIndex: -1 };
+        } else {
+          segmentPlaybackRef.current = { ...playback, startTime: performance.now(), lastFrameIndex: -1 };
+        }
+      }
+    }
+    keyframeTickRef.current = 0;
+    setRunning(true);
+  }
+
+  function togglePlayback() {
+    if (running) {
+      setRunning(false);
+      return;
+    }
+    startPlayback();
+  }
+
+  function showPredictionForAnchor(index) {
+    if (!keyframes[index]) {
+      return;
+    }
+    const segments = predictionSegmentsRef.current;
+    const segmentIndex = Math.max(
+      0,
+      segments.findIndex((segment) => segment.from.frame_id === keyframes[index].frame_id || segment.fromAnchor.anchor_id === keyframes[index].anchor_id)
+    );
+    const segment = segments[segmentIndex];
+    setRunning(false);
+    setPlayMode("prediction");
+    setSelectedKeyframeIndex(index);
+    keyframeIndexRef.current = index;
+    if (segment?.frames.length) {
+      segmentPlaybackRef.current = { segmentIndex, startTime: performance.now(), lastFrameIndex: 0 };
+      setExpandedSegments((current) => ({ ...current, [segment.key]: true }));
+      frameRef.current = makeFrameState(segment.frames[0], frameRef.current, sequenceResult);
+      setFrame(frameRef.current);
+      return;
+    }
+    frameRef.current = frameFromKeyframe(keyframes[index], index);
+    setFrame(frameRef.current);
+  }
+
   function showKeyframe(index) {
     if (!keyframes[index]) {
+      return;
+    }
+    if (playMode === "prediction") {
+      showPredictionForAnchor(index);
       return;
     }
     setRunning(false);
@@ -839,7 +894,7 @@ function App() {
           <h1>Hand Prediction Demo</h1>
         </div>
         <div className="hero-actions">
-          <button type="button" onClick={() => setRunning(!running)} title={running ? "Pause" : "Play"}>
+          <button type="button" onClick={togglePlayback} title={running ? "Pause" : "Play"}>
             {running ? <Pause size={18} /> : <Play size={18} />}
             <span>{running ? "Pause" : "Play"}</span>
           </button>
