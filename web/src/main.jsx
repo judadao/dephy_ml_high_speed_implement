@@ -10,7 +10,7 @@ import { RealtimeDemoTab } from "./RealtimeDemoTab.jsx";
 import { activeFrameIndexForSegment, activeSegmentIndexForFrame, currentRuntimeAnchorIndexForDisplay, frameKeyframeIndexForDisplay, predictionFrameWindow } from "./demoDisplay.js";
 import { ANCHOR_MS, DEFAULT_POLICY, DEMO_RECORD_LIMIT, KEYFRAME_URL, PLAY_MODES, POLICY_URL, PREDICTION_WINDOW_AFTER, PREDICTION_WINDOW_BEFORE, RENDER_MS, RESULT_URL, RUNTIME_ANCHORS_URL, SAMPLE_KEYFRAME_URL, SEGMENTS_URL, TAB_CONTRACTS, UI_UPDATE_MS, VISIBLE_ROW_LIMIT } from "./demoConstants.js";
 import { flattenPredictionSegments, formatPredictionCsvRow, frameFromKeyframe, makeFrameState, parseCsv, parsePredictionSegmentsJsonl, parseRuntimeAnchorsJsonl } from "./demoData.js";
-import { advanceAnchorPlayback, anchorFrameAt, predictionFrameForAnchor } from "./manualPlayback.js";
+import { anchorFrameAt, predictionFrameForAnchor } from "./manualPlayback.js";
 import { resumePlaybackAtCurrentFrame, segmentDurationMs } from "./playbackTiming.js";
 import { connectDemoEvents, fetchInitialDemoData } from "./demoTransport.js";
 import "./styles.css";
@@ -233,20 +233,6 @@ function App() {
         return;
       }
       if (playMode === PLAY_MODES.ANCHORS) {
-        const now = performance.now();
-        const advanced = advanceAnchorPlayback({
-          keyframes: liveKeyframes,
-          currentIndex: anchorPlaybackRef.current.index,
-          now,
-          lastTick: anchorPlaybackRef.current.lastTick,
-          sampleMs: ANCHOR_MS,
-        });
-        if (advanced?.frame) {
-          anchorPlaybackRef.current = { index: advanced.index, lastTick: advanced.lastTick };
-          setSelectedKeyframeIndex(advanced.index);
-          frameRef.current = advanced.frame;
-          setFrame(frameRef.current);
-        }
         return;
       }
 
@@ -329,18 +315,20 @@ function App() {
   }
 
   function startPlayback() {
-    if (playMode !== PLAY_MODES.ANCHORS) {
-      const segments = predictionSegmentsRef.current;
-      if (segments.length > 0) {
-        const now = performance.now();
-        const playback = segmentPlaybackRef.current;
-        const segment = segments[playback.segmentIndex] || segments[0];
-        const isAtEnd = segment && playback.lastFrameIndex >= segment.frames.length - 1 && playback.segmentIndex >= segments.length - 1;
-        if (isAtEnd) {
-          segmentPlaybackRef.current = { segmentIndex: 0, startTime: now, lastFrameIndex: -1 };
-        } else {
-          segmentPlaybackRef.current = resumePlaybackAtCurrentFrame({ playback, segment, now });
-        }
+    if (playMode === PLAY_MODES.ANCHORS) {
+      setRunning(false);
+      return;
+    }
+    const segments = predictionSegmentsRef.current;
+    if (segments.length > 0) {
+      const now = performance.now();
+      const playback = segmentPlaybackRef.current;
+      const segment = segments[playback.segmentIndex] || segments[0];
+      const isAtEnd = segment && playback.lastFrameIndex >= segment.frames.length - 1 && playback.segmentIndex >= segments.length - 1;
+      if (isAtEnd) {
+        segmentPlaybackRef.current = { segmentIndex: 0, startTime: now, lastFrameIndex: -1 };
+      } else {
+        segmentPlaybackRef.current = resumePlaybackAtCurrentFrame({ playback, segment, now });
       }
     }
     setRunning(true);

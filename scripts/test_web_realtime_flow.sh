@@ -72,7 +72,6 @@ grep -Fq 'connectDemoEvents({' web/src/main.jsx
 grep -Fq 'if (!events) {' web/src/main.jsx
 grep -Fq 'switchPlaybackMode(tab.mode)' web/src/PlaybackToolbar.jsx
 grep -Fq 'anchorFrameAt(keyframes, selectedKeyframeIndex)' web/src/main.jsx
-grep -Fq 'advanceAnchorPlayback({' web/src/main.jsx
 grep -Fq 'anchorPlaybackRef' web/src/main.jsx
 grep -Fq 'keyframesRef.current' web/src/main.jsx
 grep -Fq 'sequenceResultRef.current' web/src/main.jsx
@@ -80,6 +79,11 @@ grep -Fq '}, [playMode, running, playbackReady]);' web/src/main.jsx
 grep -Fq 'pausedFrameIndex / segment.frames.length' web/src/playbackTiming.js
 grep -Fq 'if (playMode === PLAY_MODES.ANCHORS) {' web/src/main.jsx
 grep -Fq 'setRunning(false);' web/src/main.jsx
+grep -Fq 'return;' web/src/main.jsx
+if grep -Fq 'advanceAnchorPlayback({' web/src/main.jsx; then
+    echo "anchors tab should not auto-replay anchors" >&2
+    exit 1
+fi
 if grep -Fq 'setPlayMode(tab.mode); setRunning(true)' web/src/main.jsx; then
     echo "anchors tab switch should not auto-start playback" >&2
     exit 1
