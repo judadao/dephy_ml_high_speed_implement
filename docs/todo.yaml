@@ -8,11 +8,17 @@ items:
   - id: cyclic_snapshot_schema
     title: Define snapshot and key-state recording format
     status: pending
+  - id: cyclic_synthetic_v1
+    title: Implement cyclic_io_synthetic_v1 benchmark cases
+    status: pending
   - id: cyclic_phase_normalization
     title: Implement cycle phase normalization and period detection
     status: pending
   - id: cyclic_few_shot_dataset
     title: Build few-shot fine-tune dataset format from positive periodic samples
+    status: pending
+  - id: cyclic_training_targets
+    title: Add phase, snapshot, trajectory, endpoint, smoothness, and noisy convergence training targets
     status: pending
   - id: cyclic_phase_snapshot_estimator
     title: Estimate phase and nearest snapshot from noisy runtime IO
