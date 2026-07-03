@@ -532,9 +532,9 @@ The web UI is intentionally split by playback mode:
 - Runtime anchor rows show queued segment badges, but intermediate prediction
   CSV rows are shown only for the currently active segment. This avoids mixing
   future queued predictions with the live playback state.
-- `Reference samples` are shown in a separate panel and never drive runtime
-  prediction playback. Reference/sample keyframes are loaded as the complete
-  keyframe script; only runtime demo records and prediction log views are
+- Sample keyframes are loaded as the complete keyframe script. `Prediction`
+  renders them with their sample-derived prediction rows; `Anchors` renders
+  only the keyframes. Only realtime demo records and prediction log views are
   limited to the latest 15 entries.
 - The active runtime anchor row is kept centered inside the small anchor panel
   without scrolling the larger control panel.
@@ -545,7 +545,8 @@ do not require touching the whole page:
 - `web/src/main.jsx`: React page composition, state wiring, and mode selection.
 - `web/src/RealtimeDemoTab.jsx`: live IO keyframe and current prediction row UI.
 - `web/src/DeviceIoPanel.jsx`: current device/runtime IO keyframe display.
-- `web/src/PredictionTab.jsx`: generated segment inspection and folded rows.
+- `web/src/PredictionTab.jsx`: sample keyframes with folded sample-derived
+  prediction rows.
 - `web/src/AnchorsTab.jsx`: complete sample keyframe playback/review UI.
 - `web/src/PlaybackToolbar.jsx`: status strip, source strip, mode tabs, and picker.
 - `web/src/MetricsPanels.jsx`: live frame metrics and policy/result metrics.
@@ -560,8 +561,9 @@ do not require touching the whole page:
 - `web/src/HandScene.jsx`: Three.js hand rendering only.
 
 Switching tabs does not auto-start playback. `Realtime Demo` follows the live
-IO/prediction stream, `Prediction` inspects generated prediction segments, and
-`Anchors` plays the complete sample keyframe script when Play is pressed.
+IO/prediction stream, `Prediction` plays sample-derived prediction rows under
+sample keyframes, and `Anchors` plays the complete sample keyframe script when
+Play is pressed.
 
 Playback regressions are guarded by `scripts/test_web_playback_controller.mjs`
 and `make -f Makefile.linux web-realtime-flow-check`:
