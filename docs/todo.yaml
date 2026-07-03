@@ -104,6 +104,12 @@ items:
   - id: web_runtime_anchor_layout
     title: Split web demo into runtime anchors, prediction, and reference samples
     status: done
+  - id: runtime_io_loop_output
+    title: Add live runtime IO loop output for web demos
+    status: done
+  - id: web_prediction_active_segment
+    title: Simplify web prediction display around the active segment
+    status: done
   - id: learned_bootstrap_model
     title: Replace lightweight bootstrap prior with fuller learned model
     status: pending_discussion

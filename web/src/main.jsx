@@ -110,9 +110,16 @@ function frameFromKeyframe(keyframe, index = 0) {
 
 function segmentEndpoint(value, fallbackId, fallbackMs) {
   if (value && typeof value === "object") {
-    return { frame_id: value.frame_id ?? fallbackId, t_ms: Number(value.t_ms ?? fallbackMs ?? 0) };
+    return {
+      anchor_id: value.anchor_id ?? value.frame_id ?? fallbackId,
+      frame_id: value.frame_id ?? value.anchor_id ?? fallbackId,
+      t_ms: Number(value.t_ms ?? fallbackMs ?? 0),
+      source: value.source ?? "runtime_anchor",
+      target_kind: value.target_kind ?? "observed_anchor",
+      confidence: Number(value.confidence ?? 0.85),
+    };
   }
-  return { frame_id: value ?? fallbackId, t_ms: Number(fallbackMs ?? 0) };
+  return { anchor_id: value ?? fallbackId, frame_id: value ?? fallbackId, t_ms: Number(fallbackMs ?? 0), source: "runtime_anchor", target_kind: "observed_anchor", confidence: 0.85 };
 }
 
 function normalizePredictionFrame(frame, segmentType) {
@@ -147,6 +154,9 @@ function parsePredictionSegmentsJsonl(text) {
         source: segment.source || "loaded_segments",
         from: segmentEndpoint(segment.from, `from_${index}`, segment.start_t_ms),
         to: segmentEndpoint(segment.to, `to_${index}`, segment.target_t_ms),
+        fromAnchor: segmentEndpoint(segment.from_anchor || segment.from, `from_${index}`, segment.start_t_ms),
+        toAnchor: segmentEndpoint(segment.to_anchor || segment.to, `to_${index}`, segment.target_t_ms),
+        targetKind: segment.target_kind || (segment.is_predicted_target ? "predicted_anchor" : "observed_anchor"),
         confidence: Number(segment.confidence ?? 0.95),
         isPredictedTarget: Boolean(segment.is_predicted_target),
         isCorrected: Boolean(segment.is_corrected),
@@ -747,6 +757,8 @@ function App() {
     predictionSegments.findIndex((segment) => segment.frames.some((item) => item.csvLine === frame?.csvLine) || segment.to.frame_id === frame?.target_frame)
   );
   const activeSegment = predictionSegments[activeSegmentIndex];
+  const activeSegmentFrameIndex = activeSegment ? Math.max(0, activeSegment.frames.findIndex((prediction) => prediction.csvLine === frame?.csvLine)) : 0;
+  const activeSegmentProgress = activeSegment && activeSegment.frames.length > 0 ? Math.min(100, Math.round(((activeSegmentFrameIndex + 1) / activeSegment.frames.length) * 100)) : 0;
   const keyframeIndexById = useMemo(() => new Map(keyframes.map((item, index) => [item.frame_id, index])), [keyframes]);
   const activeKeyframeIndex = sequenceMode
     ? Math.max(0, keyframeIndexById.get(activeSegment?.from.frame_id) ?? keyframeIndexById.get(activeSegment?.to.frame_id) ?? frameKeyframeIndex)
@@ -889,6 +901,39 @@ function App() {
             </div>
           </div>
 
+          <div className="current-prediction">
+            <div className="timeline-head">
+              <span>current prediction</span>
+              <strong>{activeSegment ? `${activeSegmentProgress}%` : "-"}</strong>
+            </div>
+            <div className="prediction-summary">
+              <div>
+                <span>type</span>
+                <strong>{activeSegment?.segmentType ?? "-"}</strong>
+              </div>
+              <div>
+                <span>from</span>
+                <strong>{activeSegment?.fromAnchor.anchor_id ?? "-"}</strong>
+              </div>
+              <div>
+                <span>to</span>
+                <strong>{activeSegment?.toAnchor.anchor_id ?? "-"}</strong>
+              </div>
+              <div>
+                <span>target</span>
+                <strong>{activeSegment?.targetKind ?? "-"}</strong>
+              </div>
+              <div>
+                <span>row</span>
+                <strong>{activeSegment ? `${activeSegmentFrameIndex + 1}/${activeSegment.frames.length}` : "-"}</strong>
+              </div>
+              <div>
+                <span>confidence</span>
+                <strong>{activeSegment ? activeSegment.confidence.toFixed(2) : "-"}</strong>
+              </div>
+            </div>
+          </div>
+
           <div className="script-panels">
             <div className="script-panel">
               <div className="timeline-head">
@@ -924,9 +969,9 @@ function App() {
                                   {isOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                                   <span>{segment.segmentType}</span>
                                   <strong>{segment.frames.length} rows</strong>
-                                  <span>{segment.to.frame_id}</span>
+                                  <span>{isActiveSegment ? `${segment.fromAnchor.anchor_id} -> ${segment.toAnchor.anchor_id}` : `queued -> ${segment.toAnchor.anchor_id}`}</span>
                                 </button>
-                                {isOpen ? (
+                                {isOpen && isActiveSegment ? (
                                   <div className="predicted-list">
                                     <div className="script-row header">
                                       <span>#</span>
@@ -948,7 +993,7 @@ function App() {
                                       </div>
                                     ) : null}
                                   </div>
-                                ) : null}
+                                ) : isOpen ? <div className="window-range">queued segment; rows are shown only when this segment is active</div> : null}
                               </div>
                             );
                           })

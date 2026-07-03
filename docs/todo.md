@@ -59,6 +59,8 @@ All initial TODO items are implemented as first-pass, tested building blocks.
 - [x] Add runtime IO generator and IO-to-anchor adapter.
 - [x] Make realtime watcher consume `--anchors` as the official runtime input.
 - [x] Split web demo into runtime anchors, current prediction, and reference samples.
+- [x] Add live runtime IO loop output for web demos.
+- [x] Simplify web prediction display around the active segment.
 
 ## Pending Model Discussion
 

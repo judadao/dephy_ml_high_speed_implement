@@ -434,6 +434,46 @@ button.keyframe {
   border-bottom: 1px solid var(--line);
 }
 
+.current-prediction {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.prediction-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.prediction-summary div {
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid #263241;
+  border-radius: 7px;
+  background: #0b1118;
+}
+
+.prediction-summary span {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.prediction-summary strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .script-panel {
   min-width: 0;
   display: grid;

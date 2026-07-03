@@ -12,7 +12,7 @@ KEYFRAME_MODE ?= grasp_can
 LIB := $(OUTDIR)/libdephy_ml_high_speed_implement.a
 OBJS := $(OUTDIR)/src/bitmap_anim.o $(OUTDIR)/src/joint_predictor.o $(OUTDIR)/src/hand_predictor.o
 
-.PHONY: all structure-audit direct-test test hand-rl-check hand-sequence-check hand-realtime-check runtime-anchor-check bootstrap-prior-check io-device-pipeline-check io-device-realtime-hand-check zephyr-metadata demo web-demo-data web-realtime-demo-data web-realtime-service web-sequence-demo-loop web-install web-build web web-render-check web-sse-check clean
+.PHONY: all structure-audit direct-test test hand-rl-check hand-sequence-check hand-realtime-check runtime-anchor-check runtime-io-loop-check bootstrap-prior-check io-device-pipeline-check io-device-realtime-hand-check zephyr-metadata demo web-demo-data web-realtime-demo-data web-realtime-service web-runtime-loop web-sequence-demo-loop web-install web-build web web-render-check web-sse-check clean
 
 all: $(LIB) $(OUTDIR)/dephy_bitmap_anim $(OUTDIR)/dephy_joint_replay $(OUTDIR)/dephy_hand_predict
 
@@ -79,6 +79,9 @@ hand-realtime-check:
 runtime-anchor-check:
 	OUTDIR=$(OUTDIR) sh scripts/test_runtime_anchor_flow.sh
 
+runtime-io-loop-check:
+	OUTDIR=$(OUTDIR) sh scripts/test_runtime_io_loop.sh
+
 bootstrap-prior-check:
 	OUTDIR=$(OUTDIR) sh scripts/test_bootstrap_prior.sh
 
@@ -114,6 +117,10 @@ web-realtime-demo-data:
 
 web-realtime-service:
 	OUTDIR=$(OUTDIR) FRAMES=$(FRAMES) sh scripts/run_hand_realtime_service.sh
+
+web-runtime-loop:
+	if [ ! -f $(OUTDIR)/hand_sequence/model.json ]; then OUTDIR=$(OUTDIR) sh scripts/test_hand_sequence_model.sh >/dev/null; fi
+	OUTDIR=$(OUTDIR) FRAMES=$(FRAMES) LOOP=0 sh scripts/run_hand_runtime_loop_demo.sh
 
 web-build: web-demo-data
 	npm --prefix web run build
