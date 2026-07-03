@@ -14,6 +14,7 @@ const SEGMENTS_URL = "/demo/hand_sequence/prediction_segments.jsonl";
 const RESULT_URL = "/demo/hand_sequence/result.json";
 const RENDER_MS = 16;
 const ANCHOR_MS = 300;
+const UI_UPDATE_MS = 80;
 const PREDICTION_WINDOW_BEFORE = 36;
 const PREDICTION_WINDOW_AFTER = 36;
 const DEFAULT_POLICY = {
@@ -383,6 +384,7 @@ function App() {
   const keyframeScrollRef = useRef(null);
   const activeKeyframeRowRef = useRef(null);
   const [frame, setFrame] = useState(frameRef.current);
+  const lastUiUpdateRef = useRef(0);
   const keyframeIndexRef = useRef(0);
   const keyframeTickRef = useRef(0);
   const [running, setRunning] = useState(true);
@@ -600,7 +602,10 @@ function App() {
               const next = makeFrameState(nextFrame, previous, sequenceResult);
               next.anchorLoop = 1;
               frameRef.current = next;
-              setFrame(next);
+              if (now - lastUiUpdateRef.current >= UI_UPDATE_MS) {
+                lastUiUpdateRef.current = now;
+                setFrame(next);
+              }
               segmentPlaybackRef.current = { ...playback, lastFrameIndex };
             }
             return;
@@ -630,7 +635,10 @@ function App() {
         const next = makeFrameState(nextFrame, previous, sequenceResult);
         next.anchorLoop = 1;
         frameRef.current = next;
-        setFrame(next);
+        if (now - lastUiUpdateRef.current >= UI_UPDATE_MS) {
+          lastUiUpdateRef.current = now;
+          setFrame(next);
+        }
       }
     }, RENDER_MS);
     return () => window.clearInterval(timer);
@@ -1105,8 +1113,4 @@ function App() {
   );
 }
 
-createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+createRoot(document.getElementById("root")).render(<App />);
