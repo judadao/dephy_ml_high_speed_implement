@@ -275,12 +275,86 @@ CSV also keeps the exact keyframe anchor rows, so five keyframes produce
 `5 + (5 - 1) * 1000 = 4005` rows. Omit `--frames` to fall back to the
 lower-rate `--render-ms` spacing.
 
+## Realtime Keyframe Append Flow
+
+The production direction is the append flow. The device or simulator is the
+low-rate truth source, and implement owns all high-rate prediction:
+
+```txt
+simul/device input
+  -> realtime keyframe append
+  -> implement watches the keyframe stream
+  -> first keyframe A creates a bootstrap guess
+  -> each new keyframe B creates A-to-B prediction
+  -> optional correction segment reconciles a bad bootstrap guess
+  -> append prediction_segments.jsonl
+  -> web or downstream consumers reload the appended result
+```
+
+The watcher keeps three segment types:
+
+- `bootstrap`: only keyframe A exists, so the model uses a low-confidence
+  prior/extrapolation and guesses the next target.
+- `confirmed`: real keyframe A and B are both known; the final prediction frame
+  must match B exactly.
+- `correction`: the bootstrap target was wrong enough to need a smooth segment
+  back to the real keyframe.
+
+Run a finite local realtime demo:
+
+```sh
+make -f Makefile.linux web-realtime-demo-data KEYFRAME_COUNT=16 FRAMES=1000
+```
+
+Run only the watcher test:
+
+```sh
+make -f Makefile.linux hand-realtime-check
+```
+
+The raw commands are:
+
+```sh
+KEYFRAME_COUNT=16 SAMPLE_MS=300 LOOP=1 \
+  sh scripts/run_hand_realtime_keyframe_simul.sh web/public/demo/hand_keyframes.csv
+
+python3 scripts/dephy_hand_realtime_watcher.py \
+  --keyframes web/public/demo/hand_keyframes.csv \
+  --model build_out/hand_sequence/model.json \
+  --out web/public/demo/hand_sequence/prediction_segments.jsonl \
+  --result web/public/demo/hand_sequence/result.json \
+  --sample-ms 300 \
+  --frames 1000 \
+  --truncate
+```
+
+`prediction_segments.jsonl` is append-only during a realtime run. Each JSONL
+line is a complete segment with metadata:
+
+```json
+{
+  "format": "dephy_prediction_segment_v1",
+  "segment_type": "confirmed",
+  "from": {"frame_id": "kf_0001", "t_ms": 300},
+  "to": {"frame_id": "kf_0002", "t_ms": 600},
+  "frames_between_keyframes": 1000,
+  "confidence": 0.98,
+  "frames": []
+}
+```
+
+`result.json` is only a status summary. It records counters such as
+`keyframes_seen`, `bootstrap_segments`, `confirmed_segments`,
+`correction_segments`, `prediction_frames`, and segment-local smoothness
+metrics. Consumers should treat `keyframes.csv` and `prediction_segments.jsonl`
+as the data source.
+
 ## Web Hand Demo
 
 The Vite web demo visualizes the single-palm scope. The left side renders hand
 joint points and bones. The right side shows a CSV keyframe stream that behaves
 like a simulator sending one anchor every 300ms, while the implement side
-generates 16ms predicted frames between anchors.
+appends prediction segment batches between anchors.
 
 ```sh
 make -f Makefile.linux web-install
@@ -289,50 +363,27 @@ make -f Makefile.linux web
 
 Then open `http://127.0.0.1:8091/`.
 
-The web demo is a realtime viewer. It polls these served files once per second:
+The web demo is a realtime playback surface. It polls these served files once
+per second:
 
 ```txt
-web/public/demo/hand_sequence/prediction.csv
+web/public/demo/hand_keyframes.csv
+web/public/demo/hand_policy.json
+web/public/demo/hand_sequence/prediction_segments.jsonl
 web/public/demo/hand_sequence/result.json
 ```
 
-Run the writer loop in another terminal or tmux session:
+The browser does not run the prediction model. The implement side receives the
+300ms keyframe anchors and appends prediction segments. The first keyframe can
+produce a `bootstrap` segment before the next real keyframe arrives. Later real
+keyframes produce `confirmed` segments, and large bootstrap misses can add
+`correction` segments. The web page only loads those segment batches, plays
+them, and folds the intermediate rows under the related keyframe for inspection.
 
-```sh
-make -f Makefile.linux web-sequence-demo-loop
-```
-
-The writer loop keeps regenerating the core prediction artifacts and atomically
-updates the served CSV/JSON. The browser reloads the updated CSV without doing
-prediction inside React.
-
-By default the writer loop uses `RANDOM_INIT=1`, `KEYFRAME_MODE=grasp_can`,
-`KEYFRAME_COUNT=64`, `NOISE_SCALE=1.0`, and `FRAMES=1000`. Every loop
-generates a new noisy grasp-and-release keyframe path, writes 1000 predicted
-rows between each pair of yellow keyframe anchors, and appends completion
-metrics to `result.json`. The default web scene focuses on a smooth hand fist:
-the hand starts open, closes into a fist, holds briefly, releases, and returns
-to the original pose. The path uses denser close, hold, and release anchors so
-the predictor has enough keyframes to generate a smooth open-close-open motion.
-
-Override it when needed:
-
-```sh
-FRAMES=300 make -f Makefile.linux web-sequence-demo-loop
-RANDOM_INIT=0 make -f Makefile.linux web-sequence-demo-loop
-NOISE_SCALE=2.0 make -f Makefile.linux web-sequence-demo-loop
-KEYFRAME_COUNT=16 KEYFRAME_MODE=gesture make -f Makefile.linux web-sequence-demo-loop
-KEYFRAME_COUNT=64 KEYFRAME_MODE=grasp_can make -f Makefile.linux web-sequence-demo-loop
-KEYFRAME_MODE=grasp_can make -f Makefile.linux web-sequence-demo-loop
-```
-
-The completion metric is intentionally measured across changing input paths,
-not one repeated clean script. The test suite covers both noisy template
-keyframes and one fully random keyframe path.
-
-The demo is browser-side only: it loads CSV keyframe fixtures that mirror the
-device loop, then applies the same bounded prediction idea to update palm
-position, rotation, grip, error, confidence, and target keyframe data live.
+The default web scene focuses on a smooth hand fist: the hand starts open,
+closes into a fist, holds briefly, releases, and returns to the original pose.
+The path uses denser close, hold, and release anchors so the predictor has
+enough keyframes to generate a smooth open-close-open motion.
 
 The active demo data is loaded from external fixtures instead of being hardcoded
 inside React:
@@ -340,10 +391,11 @@ inside React:
 - `web/public/demo/hand_keyframes.csv`: generated random noisy test keyframes
   for the current web run.
 - `examples/hand/hand_policy.json`: source prediction policy parameters.
-- `web/public/demo/hand_sequence/prediction.csv`: generated prediction output
-  with 1000 predicted rows between every keyframe pair by default. The default
-  web test path has 64 fist keyframes, so it produces
-  `64 + (64 - 1) * 1000 = 63064` rows.
+- `web/public/demo/hand_sequence/prediction_segments.jsonl`: implement output.
+  Each line is one bootstrap, confirmed, or correction batch with 1000 predicted
+  frames by default.
+- `web/public/demo/hand_sequence/result.json`: implement completion and smoothness
+  metrics for the generated segments.
 
 The web UI is intentionally split by playback mode:
 
@@ -363,12 +415,17 @@ make -f Makefile.linux web-demo-data
 ```
 
 The `web`, `web-build`, and `web-render-check` targets run this sync
-automatically, so web demo data uses the same random/noisy test path as the CLI
-checks. Control the test data seed, noise level, and prediction density with:
+automatically, so web demo data uses the same random/noisy keyframe path and
+model-generated segment batches as the CLI checks. Control the test data seed,
+noise level, and prediction density with:
 
 ```sh
 WEB_SEED=222 NOISE_SCALE=1.5 KEYFRAME_COUNT=64 FRAMES=1000 make -f Makefile.linux web
 ```
+
+For offline model checks, `make -f Makefile.linux hand-sequence-check` and
+`make -f Makefile.linux web-sequence-demo-loop` can still generate prediction
+artifacts. The web loop uses the same segment JSONL format as the browser demo.
 
 The intended device-to-implement path is:
 
