@@ -12,7 +12,7 @@ const demoFiles = {
   result: "demo/hand_sequence/result.json",
 };
 const demoRecordLimit = 15;
-const csvTailEvents = new Set(["sample_keyframes", "runtime_io"]);
+const csvTailEvents = new Set(["runtime_io"]);
 const jsonlTailEvents = new Set(["runtime_anchors", "prediction_segments"]);
 
 function tailDemoText(event, data) {

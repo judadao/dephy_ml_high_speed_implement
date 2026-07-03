@@ -533,7 +533,9 @@ The web UI is intentionally split by playback mode:
   CSV rows are shown only for the currently active segment. This avoids mixing
   future queued predictions with the live playback state.
 - `Reference samples` are shown in a separate panel and never drive runtime
-  prediction playback.
+  prediction playback. Reference/sample keyframes are loaded as the complete
+  keyframe script; only runtime demo records and prediction log views are
+  limited to the latest 15 entries.
 - The active runtime anchor row is kept centered inside the small anchor panel
   without scrolling the larger control panel.
 
@@ -542,6 +544,7 @@ do not require touching the whole page:
 
 - `web/src/main.jsx`: React page composition, state wiring, and mode selection.
 - `web/src/RealtimeDemoTab.jsx`: live IO keyframe and current prediction row UI.
+- `web/src/DeviceIoPanel.jsx`: current device/runtime IO keyframe display.
 - `web/src/PredictionTab.jsx`: generated segment inspection and folded rows.
 - `web/src/AnchorsTab.jsx`: raw runtime anchor playback/review UI.
 - `web/src/PlaybackToolbar.jsx`: status strip, source strip, mode tabs, and picker.

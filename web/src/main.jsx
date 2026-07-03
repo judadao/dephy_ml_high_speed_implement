@@ -59,7 +59,7 @@ function App() {
     if (csv === keyframeCsvRef.current) {
       return;
     }
-    const loadedKeyframes = parseCsv(csv, DEMO_RECORD_LIMIT);
+    const loadedKeyframes = parseCsv(csv);
     keyframeCsvRef.current = csv;
     setSampleKeyframes(loadedKeyframes);
   }

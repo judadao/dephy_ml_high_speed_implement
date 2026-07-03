@@ -11,8 +11,8 @@ grep -Fq 'current runtime IO keyframe + current prediction segment + current pre
 grep -Fq 'currentRuntimeAnchorIndexForDisplay({ realtimeMode' web/src/main.jsx
 grep -Fq 'if (!realtimeMode)' web/src/demoDisplay.js
 grep -Fq 'visibleRuntimeAnchors = realtimeMode && currentRuntimeAnchor ? [currentRuntimeAnchor] : keyframes' web/src/main.jsx
-grep -Fq 'current runtime io' web/src/RealtimeDemoTab.jsx
-grep -Fq 'current keyframe from io' web/src/RealtimeDemoTab.jsx
+grep -Fq 'current runtime io' web/src/DeviceIoPanel.jsx
+grep -Fq 'current keyframe from io' web/src/DeviceIoPanel.jsx
 grep -Fq 'prediction for current keyframe' web/src/RealtimeDemoTab.jsx
 grep -Fq 'current prediction rows' web/src/RealtimeDemoTab.jsx
 grep -Fq 'predictionLag' web/src/main.jsx
@@ -26,17 +26,28 @@ grep -Fq 'const demoRecordLimit = 15;' web/vite.config.js
 grep -Fq 'tailDemoText(event, data)' web/vite.config.js
 grep -Fq 'parseRuntimeAnchorsJsonl(text, DEMO_RECORD_LIMIT)' web/src/main.jsx
 grep -Fq 'parsePredictionSegmentsJsonl(text, DEMO_RECORD_LIMIT)' web/src/main.jsx
+grep -Fq 'parseCsv(csv);' web/src/main.jsx
+if grep -Fq 'parseCsv(csv, DEMO_RECORD_LIMIT)' web/src/main.jsx; then
+    echo "sample keyframes should load the complete keyframe script" >&2
+    exit 1
+fi
+if grep -Fq 'sample_keyframes", "runtime_io' web/vite.config.js; then
+    echo "sample keyframes should not be tailed by SSE" >&2
+    exit 1
+fi
 grep -Fq 'latestPlayableSegmentKeyRef' web/src/main.jsx
 grep -Fq 'latestKey !== previousLatestKey' web/src/main.jsx
 grep -Fq 'formatPredictionCsvRow(prediction)' web/src/RealtimeDemoTab.jsx
 grep -Fq 'formatPredictionCsvRow(prediction)' web/src/PredictionTab.jsx
 grep -Fq 'export function RealtimeDemoTab' web/src/RealtimeDemoTab.jsx
+grep -Fq 'export function DeviceIoPanel' web/src/DeviceIoPanel.jsx
 grep -Fq 'export function PredictionTab' web/src/PredictionTab.jsx
 grep -Fq 'export function AnchorsTab' web/src/AnchorsTab.jsx
 grep -Fq 'export function PlaybackToolbar' web/src/PlaybackToolbar.jsx
 grep -Fq 'export function MetricsPanels' web/src/MetricsPanels.jsx
 grep -Fq 'export function DemoHeader' web/src/DemoHeader.jsx
 grep -Fq 'from "./RealtimeDemoTab.jsx"' web/src/main.jsx
+grep -Fq 'from "./DeviceIoPanel.jsx"' web/src/RealtimeDemoTab.jsx
 grep -Fq 'from "./PredictionTab.jsx"' web/src/main.jsx
 grep -Fq 'from "./AnchorsTab.jsx"' web/src/main.jsx
 grep -Fq 'from "./PlaybackToolbar.jsx"' web/src/main.jsx
