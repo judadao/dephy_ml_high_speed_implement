@@ -46,7 +46,7 @@ contracts:
 - [x] Add convergence validation for noisy runtime IO against target snapshots.
 - [x] Add performance benchmark for inference latency and prediction throughput.
 - [x] Add result metrics writer for snapshot, phase, smoothness, latency, and accepted/rejected status.
-- [ ] Add cross-repo flow from `linux_io_device_simul` generic IO samples into the cyclic IO engine.
+- [x] Add cross-repo flow from `linux_io_device_simul` generic IO samples into the cyclic IO engine.
 
 ## Completed Single Palm Keyframe RL
 

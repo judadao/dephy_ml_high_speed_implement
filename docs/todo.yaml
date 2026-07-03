@@ -91,7 +91,7 @@ items:
     status: done
   - id: cyclic_io_device_e2e
     title: Add linux_io_device_simul generic IO to cyclic prediction e2e flow
-    status: pending
+    status: done
   - id: hand_scope_readme
     title: Document single-palm keyframe prediction scope
     status: done

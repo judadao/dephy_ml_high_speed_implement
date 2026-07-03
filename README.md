@@ -67,6 +67,7 @@ make -f Makefile.linux
 make -f Makefile.linux test
 make -f Makefile.linux hand-rl-check
 make -f Makefile.linux cyclic-io-check
+make -f Makefile.linux cyclic-io-device-e2e-check
 make -f Makefile.linux demo
 make -f Makefile.linux web-install
 make -f Makefile.linux web
@@ -103,6 +104,16 @@ python3 scripts/validate_cyclic_io_dataset.py \
 The first implementation is deliberately deterministic. It establishes the
 data contracts, vectorization, conversion, rule engine, correction metadata,
 and metrics that a learned model will later plug into.
+
+Run the generic sibling simulator e2e:
+
+```sh
+make -f Makefile.linux cyclic-io-device-e2e-check
+```
+
+This runs `linux_io_device_simul --slot-stream`, converts slot events into
+cyclic raw events and normalized vectors, then validates 1000-frame prediction
+and output conversion.
 
 ## Single Palm Keyframe Prediction
 

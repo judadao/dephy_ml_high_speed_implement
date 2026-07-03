@@ -14,7 +14,7 @@ KEYFRAME_MODE ?= grasp_can
 LIB := $(OUTDIR)/libdephy_ml_high_speed_implement.a
 OBJS := $(OUTDIR)/src/bitmap_anim.o $(OUTDIR)/src/joint_predictor.o $(OUTDIR)/src/hand_predictor.o
 
-.PHONY: all structure-audit direct-test test hand-rl-check hand-sequence-check hand-realtime-check runtime-anchor-check runtime-io-loop-check bootstrap-prior-check cyclic-io-check io-device-pipeline-check io-device-realtime-hand-check zephyr-metadata demo web-demo-data web-realtime-demo-data web-realtime-service web-realtime-demo web-runtime-loop web-realtime-flow-check web-sequence-demo-loop web-install web-build web web-render-check web-sse-check clean
+.PHONY: all structure-audit direct-test test hand-rl-check hand-sequence-check hand-realtime-check runtime-anchor-check runtime-io-loop-check bootstrap-prior-check cyclic-io-check cyclic-io-device-e2e-check io-device-pipeline-check io-device-realtime-hand-check zephyr-metadata demo web-demo-data web-realtime-demo-data web-realtime-service web-realtime-demo web-runtime-loop web-realtime-flow-check web-sequence-demo-loop web-install web-build web web-render-check web-sse-check clean
 
 all: $(LIB) $(OUTDIR)/dephy_bitmap_anim $(OUTDIR)/dephy_joint_replay $(OUTDIR)/dephy_hand_predict
 
@@ -89,6 +89,9 @@ bootstrap-prior-check:
 
 cyclic-io-check:
 	OUTDIR=$(OUTDIR) sh scripts/test_cyclic_io.sh
+
+cyclic-io-device-e2e-check:
+	OUTDIR=$(OUTDIR) sh scripts/test_cyclic_io_device_e2e.sh
 
 web-sequence-demo-loop:
 	FRAMES=$(FRAMES) KEYFRAME_COUNT=$(KEYFRAME_COUNT) KEYFRAME_MODE=$(KEYFRAME_MODE) NOISE_SCALE=$(NOISE_SCALE) sh scripts/run_hand_sequence_realtime_demo.sh
