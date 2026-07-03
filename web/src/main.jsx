@@ -182,7 +182,6 @@ function App() {
       }).catch(() => {});
     };
 
-    fetchOnce();
     const events = connectDemoEvents({
       onSampleKeyframes: (text) => {
         if (!cancelled) {
@@ -215,6 +214,9 @@ function App() {
         }
       },
     });
+    if (!events) {
+      fetchOnce();
+    }
     return () => {
       cancelled = true;
       events?.close();

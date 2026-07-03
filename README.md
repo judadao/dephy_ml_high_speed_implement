@@ -489,7 +489,9 @@ anchors produce `confirmed` segments, and large bootstrap misses can add
 them, and folds the intermediate rows under the related runtime anchor for inspection.
 If SSE is unavailable, the page performs a one-shot load so static render checks
 still work, but live demo updates are expected to use EventSource rather than
-timer polling.
+timer polling. When EventSource is available, the page does not preload the full
+`prediction_segments.jsonl`; it waits for the SSE tail so a long-running demo
+does not block the browser by downloading the entire generated segment log.
 
 The default web scene focuses on a smooth hand fist: the hand starts open,
 closes into a fist, holds briefly, releases, and returns to the original pose.

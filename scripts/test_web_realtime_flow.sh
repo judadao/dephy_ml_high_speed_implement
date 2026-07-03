@@ -55,6 +55,7 @@ grep -Fq 'export function resumePlaybackAtCurrentFrame' web/src/playbackTiming.j
 grep -Fq 'export function fetchInitialDemoData' web/src/demoTransport.js
 grep -Fq 'export function connectDemoEvents' web/src/demoTransport.js
 grep -Fq 'connectDemoEvents({' web/src/main.jsx
+grep -Fq 'if (!events) {' web/src/main.jsx
 grep -Fq 'switchPlaybackMode(tab.mode)' web/src/PlaybackToolbar.jsx
 grep -Fq 'anchorFrameAt(keyframes, selectedKeyframeIndex)' web/src/main.jsx
 grep -Fq 'advanceAnchorPlayback({' web/src/main.jsx
