@@ -72,6 +72,11 @@ confidence
 source
 ```
 
+Analog values (`AI` and `AO`) should be normalized for training and inference.
+The raw engineering value should still be retained in dataset metadata or raw
+event rows so prediction output can be converted back to the case-specific IO
+scale later.
+
 Training and inference can convert those rows into vectors:
 
 ```txt
@@ -86,11 +91,17 @@ current_snapshot
 target_snapshot
 ```
 
-Model output should be a dense trajectory:
+Model output should be a dense trajectory of complete normalized IO vectors:
 
 ```txt
 1000 x IO vector
 ```
+
+The model should not directly output only the final case-specific point writes.
+Instead, the repository converts each predicted full IO vector back into the
+target case's IO point values and extra prediction metadata. This keeps the
+model generic while allowing each deployment/test case to decide which slots,
+channels, value scales, confidence fields, and metadata are emitted downstream.
 
 Each prediction frame should include:
 
@@ -98,11 +109,11 @@ Each prediction frame should include:
 frame_index
 phase
 t_ms
-predicted_DI
-predicted_DO
-predicted_AI
-predicted_AO
-predicted_Relay
+predicted normalized DI vector
+predicted normalized DO vector
+predicted normalized AI vector
+predicted normalized AO vector
+predicted normalized Relay vector
 target_snapshot
 confidence
 ```
@@ -154,6 +165,42 @@ max jerk
 inference latency
 prediction throughput
 runtime noisy IO convergence rate
+```
+
+## Discussion Queue
+
+User-operation topics are intentionally deferred for now. Do not prioritize UI
+recording flows, manual labeling flows, import/export UX, or web presentation
+until the core engine contracts are clearer.
+
+Core topics to discuss and decide next:
+
+```txt
+1. IO schema:
+   DI / DO / AI / AO / Relay value ranges, normalization, missing values, and
+   channel identity.
+
+2. Cycle boundary and phase:
+   how cycle start/end is represented and how phase is normalized to 0..1.
+
+3. Dataset generation:
+   synthetic positive, negative, and test data generation rules.
+
+4. Model input and output:
+   exact input vector, output channels, and 1000-frame prediction tensor.
+
+5. Training objective:
+   phase, snapshot, trajectory, endpoint, smoothness, and negative rejection
+   losses.
+
+6. Runtime correction:
+   how new runtime IO updates the prediction buffer and future frames.
+
+7. Fail-safe and rule engine:
+   impossible IO, low confidence, phase mismatch, and fallback behavior.
+
+8. Performance benchmark:
+   inference latency, throughput, and 1000-frame generation time.
 ```
 
 ## Current Demo Role

@@ -3,7 +3,28 @@ items:
     title: Record cyclic IO prediction product direction
     status: done
   - id: cyclic_io_schema
-    title: Define generic DI/DO/AI/AO/Relay IO sample schema
+    title: Define generic DI/DO/AI/AO/Relay IO sample schema draft
+    status: done
+  - id: cyclic_cycle_phase_rules
+    title: Define cycle boundary and phase normalization rules
+    status: pending
+  - id: cyclic_dataset_generation_rules
+    title: Define synthetic positive, negative, and test dataset generation rules
+    status: pending
+  - id: cyclic_model_io_contract
+    title: Define model input vector, output channels, and 1000-frame tensor format
+    status: pending
+  - id: cyclic_training_objective_contract
+    title: Define training objectives and negative rejection labels
+    status: pending
+  - id: cyclic_runtime_correction_contract
+    title: Define runtime correction behavior when new IO arrives
+    status: pending
+  - id: cyclic_fail_safe_contract
+    title: Define fail-safe and rule-engine behavior for impossible IO or low confidence
+    status: pending
+  - id: cyclic_performance_benchmark_contract
+    title: Define performance benchmark environment and latency/throughput metrics
     status: pending
   - id: cyclic_snapshot_schema
     title: Define snapshot and key-state recording format

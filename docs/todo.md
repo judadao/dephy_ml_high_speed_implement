@@ -10,7 +10,18 @@ data. The model should generate 1000 phase-normalized prediction frames per
 cycle or key transition while keeping runtime inference under the configured
 latency budget.
 
-- [ ] Define the generic IO sample schema for `DI`, `DO`, `AI`, `AO`, and `Relay`.
+User-operation topics are deferred for now. The next discussion and
+implementation sequence should stay focused on core data/model/runtime
+contracts:
+
+- [x] Define the generic IO sample schema draft for `DI`, `DO`, `AI`, `AO`, and `Relay`.
+- [ ] Define cycle boundary and phase normalization rules.
+- [ ] Define synthetic dataset generation rules.
+- [ ] Define model input vector, output channels, and 1000-frame tensor format.
+- [ ] Define training objectives and negative rejection labels.
+- [ ] Define runtime correction behavior when new IO arrives.
+- [ ] Define fail-safe and rule-engine behavior for impossible IO or low confidence.
+- [ ] Define performance benchmark environment and latency/throughput metrics.
 - [ ] Define snapshot/key-state recording format and import/export flow.
 - [ ] Implement `cyclic_io_synthetic_v1` benchmark cases.
 - [ ] Generate positive, negative, and test datasets following `cyclic_io_dataset_design.md`.
