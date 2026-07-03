@@ -18,7 +18,7 @@ export function PredictionTab({
   sequenceCsvRows,
   showKeyframe,
   toggleSegment,
-  visibleRuntimeAnchors,
+  visibleKeyframes,
   visibleRowLimit,
   windowAfter,
   windowBefore,
@@ -61,18 +61,16 @@ export function PredictionTab({
       <div className="script-panels">
         <div className="script-panel">
           <div className="timeline-head">
-            <span>runtime io anchors</span>
+            <span>sample key frames</span>
             <strong>{activeKeyframeIndex + 1}/{keyframes.length}</strong>
           </div>
           <div className="script-window keyframe-window" ref={keyframeScrollRef}>
-            {visibleRuntimeAnchors.map((item) => {
-              const keyframeIndex = keyframes.findIndex((anchor) => anchor.anchor_id === item.anchor_id || anchor.frame_id === item.frame_id);
+            {visibleKeyframes.map((item) => {
+              const keyframeIndex = keyframes.findIndex((keyframe) => keyframe.frame_id === item.frame_id);
               const segmentsForKeyframe = predictionSegments.filter(
                 (segment) =>
                   segment.from.frame_id === item.frame_id ||
                   segment.to.frame_id === item.frame_id ||
-                  segment.fromAnchor.anchor_id === item.anchor_id ||
-                  segment.toAnchor.anchor_id === item.anchor_id ||
                   (segment.segmentType === "correction" && segment.to.frame_id === item.frame_id)
               );
               const isActive = keyframeIndex === activeKeyframeIndex;

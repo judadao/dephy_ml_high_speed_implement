@@ -318,12 +318,13 @@ function App() {
   }
 
   function showPredictionForAnchor(index) {
-    if (!keyframes[index]) {
+    const sourceKeyframes = reviewKeyframes;
+    if (!sourceKeyframes[index]) {
       return;
     }
     const segments = predictionSegmentsRef.current;
     const { segmentIndex, segment, frame: manualFrame } = predictionFrameForAnchor({
-      keyframes,
+      keyframes: sourceKeyframes,
       segments,
       index,
       previousFrame: frameRef.current,
@@ -422,10 +423,10 @@ function App() {
   const activeSegment = predictionSegments[activeSegmentIndex];
   const { index: activeSegmentFrameIndex, isPlaying: activeSegmentIsPlaying } = activeFrameIndexForSegment(activeSegment, frame);
   const activeSegmentProgress = activeSegment && activeSegment.frames.length > 0 && activeSegmentIsPlaying ? Math.min(100, Math.round(((activeSegmentFrameIndex + 1) / activeSegment.frames.length) * 100)) : 0;
-  const keyframeIndexById = useMemo(() => new Map(keyframes.map((item, index) => [item.frame_id, index])), [keyframes]);
+  const keyframeIndexById = useMemo(() => new Map(reviewKeyframes.map((item, index) => [item.frame_id, index])), [reviewKeyframes]);
   const currentRuntimeAnchorIndex = currentRuntimeAnchorIndexForDisplay({ realtimeMode, keyframes, activeSegment, frame, selectedKeyframeIndex });
   const currentRuntimeAnchor = keyframes[currentRuntimeAnchorIndex] || keyframes[0];
-  const visibleRuntimeAnchors = realtimeMode && currentRuntimeAnchor ? [currentRuntimeAnchor] : playMode === PLAY_MODES.ANCHORS ? reviewKeyframes : keyframes;
+  const visibleRuntimeAnchors = realtimeMode && currentRuntimeAnchor ? [currentRuntimeAnchor] : reviewKeyframes;
   const latestReceivedAnchorIndex = Math.max(0, keyframes.length - 1);
   const predictionLag = realtimeMode ? Math.max(0, latestReceivedAnchorIndex - currentRuntimeAnchorIndex) : 0;
   const activeKeyframeIndex = realtimeMode
@@ -568,13 +569,13 @@ function App() {
               expandedSegments={expandedSegments}
               frame={frame}
               keyframeScrollRef={keyframeScrollRef}
-              keyframes={keyframes}
+              keyframes={reviewKeyframes}
               predictionSegments={predictionSegments}
               sampleKeyframes={sampleKeyframes}
               sequenceCsvRows={sequenceCsvRows}
               showKeyframe={showKeyframe}
               toggleSegment={toggleSegment}
-              visibleRuntimeAnchors={visibleRuntimeAnchors}
+              visibleKeyframes={reviewKeyframes}
               visibleRowLimit={VISIBLE_ROW_LIMIT}
               windowAfter={PREDICTION_WINDOW_AFTER}
               windowBefore={PREDICTION_WINDOW_BEFORE}

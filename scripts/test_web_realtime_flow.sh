@@ -11,13 +11,13 @@ grep -Fq 'tabContracts.map' web/src/PlaybackToolbar.jsx
 grep -Fq 'current runtime IO keyframe + current prediction segment + current prediction row' web/src/demoConstants.js
 grep -Fq 'currentRuntimeAnchorIndexForDisplay({ realtimeMode' web/src/main.jsx
 grep -Fq 'if (!realtimeMode)' web/src/demoDisplay.js
-grep -Fq 'visibleRuntimeAnchors = realtimeMode && currentRuntimeAnchor ? [currentRuntimeAnchor] : playMode === PLAY_MODES.ANCHORS ? reviewKeyframes : keyframes' web/src/main.jsx
+grep -Fq 'visibleRuntimeAnchors = realtimeMode && currentRuntimeAnchor ? [currentRuntimeAnchor] : reviewKeyframes' web/src/main.jsx
 grep -Fq 'current runtime io' web/src/DeviceIoPanel.jsx
 grep -Fq 'current keyframe from io' web/src/DeviceIoPanel.jsx
 grep -Fq 'prediction for current keyframe' web/src/RealtimeDemoTab.jsx
 grep -Fq 'current prediction rows' web/src/RealtimeDemoTab.jsx
 grep -Fq 'predictionLag' web/src/main.jsx
-grep -Fq 'segment.toAnchor.anchor_id === item.anchor_id' web/src/PredictionTab.jsx
+grep -Fq 'segment.to.frame_id === item.frame_id' web/src/PredictionTab.jsx
 grep -Fq 'segmentPlaybackRef.current = { segmentIndex: latestIndex' web/src/main.jsx
 grep -Fq 'VISIBLE_ROW_LIMIT = 15' web/src/demoConstants.js
 grep -Fq 'DEMO_RECORD_LIMIT = 15' web/src/demoConstants.js
@@ -46,6 +46,7 @@ grep -Fq 'formatPredictionCsvRow(prediction)' web/src/PredictionTab.jsx
 grep -Fq 'export function RealtimeDemoTab' web/src/RealtimeDemoTab.jsx
 grep -Fq 'export function DeviceIoPanel' web/src/DeviceIoPanel.jsx
 grep -Fq 'export function PredictionTab' web/src/PredictionTab.jsx
+grep -Fq 'sample key frames' web/src/PredictionTab.jsx
 grep -Fq 'export function AnchorsTab' web/src/AnchorsTab.jsx
 grep -Fq 'sample key frames' web/src/AnchorsTab.jsx
 grep -Fq 'complete sample_keyframes.csv playback source' web/src/AnchorsTab.jsx
@@ -55,6 +56,7 @@ grep -Fq 'export function DemoHeader' web/src/DemoHeader.jsx
 grep -Fq 'playButtonState({ playMode, running })' web/src/DemoHeader.jsx
 grep -Fq 'shouldRunPlayback({ playMode, running, playbackReady })' web/src/main.jsx
 grep -Fq 'keyframesForMode({ playMode, liveKeyframes: keyframes, sampleKeyframes })' web/src/main.jsx
+grep -Fq 'const sourceKeyframes = reviewKeyframes' web/src/main.jsx
 if rg -q 'setAnchorReviewKeyframes|anchorReviewKeyframes' web/src; then
     echo "anchors tab should use complete sample keyframes, not runtime anchor snapshots" >&2
     exit 1
