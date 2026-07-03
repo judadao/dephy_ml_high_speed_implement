@@ -18,6 +18,7 @@ function App() {
   const predictionSegmentsRef = useRef([]);
   const segmentPlaybackRef = useRef({ segmentIndex: 0, startTime: 0, lastFrameIndex: -1 });
   const playableSegmentCountRef = useRef(0);
+  const latestPlayableSegmentKeyRef = useRef("");
   const [dataStatus, setDataStatus] = useState("loading");
   const frameRef = useRef(null);
   const keyframeCsvRef = useRef("");
@@ -374,15 +375,24 @@ function App() {
   useEffect(() => {
     const playableSegments = predictionSegments.filter((segment) => segment.frames.length > 0);
     const previousCount = playableSegmentCountRef.current;
+    const previousLatestKey = latestPlayableSegmentKeyRef.current;
+    const latestSegment = playableSegments[playableSegments.length - 1];
+    const latestKey = latestSegment?.key ?? "";
     predictionSegmentsRef.current = playableSegments;
     playableSegmentCountRef.current = playableSegments.length;
+    latestPlayableSegmentKeyRef.current = latestKey;
     if (playableSegments.length === 0) {
       return;
     }
-    if (realtimeMode && playableSegments.length > previousCount) {
+    if (sequenceMode && running && latestKey && latestKey !== previousLatestKey) {
       const latestIndex = playableSegments.length - 1;
       segmentPlaybackRef.current = { segmentIndex: latestIndex, startTime: performance.now(), lastFrameIndex: -1 };
       setExpandedSegments({ [playableSegments[latestIndex].key]: true });
+      const firstFrame = playableSegments[latestIndex].frames[0];
+      if (firstFrame) {
+        frameRef.current = makeFrameState(firstFrame, frameRef.current, sequenceResult);
+        setFrame(frameRef.current);
+      }
       return;
     }
     if (playableSegments.length > previousCount && previousCount > 0) {
@@ -396,7 +406,7 @@ function App() {
     if (segmentPlaybackRef.current.segmentIndex >= playableSegments.length) {
       segmentPlaybackRef.current = { segmentIndex: 0, startTime: performance.now(), lastFrameIndex: -1 };
     }
-  }, [predictionSegments, realtimeMode]);
+  }, [predictionSegments, realtimeMode, running, sequenceMode, sequenceResult]);
 
   const frameKeyframeIndex = frame
     ? Math.max(
@@ -664,7 +674,7 @@ function App() {
                   <code>{sequenceCsvRows[0] || "frame_t_ms,target_frame,palm_x,palm_y,palm_z,yaw,pitch,roll,grip"}</code>
                 </div>
                 {visibleActivePredictionFrames.map((prediction) => {
-                  const predictionRow = sequenceCsvRows[prediction.csvLine - 1] || "";
+                  const predictionRow = formatPredictionCsvRow(prediction);
                   const isActivePrediction = prediction.csvLine === frame.csvLine;
                   return (
                     <div className={isActivePrediction ? "script-row prediction-row active" : "script-row prediction-row"} key={`${prediction.csvLine}-${prediction.frame_t_ms}`}>
@@ -730,7 +740,7 @@ function App() {
                                       <code>{sequenceCsvRows[0] || "frame_t_ms,target_frame,palm_x,palm_y,palm_z,yaw,pitch,roll,grip"}</code>
                                     </div>
                                     {visibleFrames.map((prediction) => {
-                                      const predictionRow = sequenceCsvRows[prediction.csvLine - 1] || "";
+                                      const predictionRow = formatPredictionCsvRow(prediction);
                                       const isActivePrediction = prediction.csvLine === frame.csvLine;
                                       return (
                                         <div className={isActivePrediction ? "script-row prediction-row active" : "script-row prediction-row"} key={`${prediction.csvLine}-${prediction.frame_t_ms}`}>

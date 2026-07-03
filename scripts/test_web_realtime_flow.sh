@@ -25,6 +25,9 @@ grep -Fq 'const demoRecordLimit = 15;' web/vite.config.js
 grep -Fq 'tailDemoText(event, data)' web/vite.config.js
 grep -Fq 'parseRuntimeAnchorsJsonl(text, DEMO_RECORD_LIMIT)' web/src/main.jsx
 grep -Fq 'parsePredictionSegmentsJsonl(text, DEMO_RECORD_LIMIT)' web/src/main.jsx
+grep -Fq 'latestPlayableSegmentKeyRef' web/src/main.jsx
+grep -Fq 'latestKey !== previousLatestKey' web/src/main.jsx
+grep -Fq 'formatPredictionCsvRow(prediction)' web/src/main.jsx
 grep -Fq 'pausedFrameIndex / segment.frames.length' web/src/main.jsx
 if grep -Fq 'segmentPlaybackRef.current = { ...playback, startTime: performance.now(), lastFrameIndex: -1 };' web/src/main.jsx; then
     echo "playback resume still resets to segment start" >&2
