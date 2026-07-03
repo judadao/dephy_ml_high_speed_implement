@@ -116,10 +116,10 @@ All initial TODO items are implemented as first-pass, tested building blocks.
 - [x] Remove selected anchor state from Realtime Demo playback.
 - [x] Split web data parsing and constants out of `web/src/main.jsx`.
 - [x] Split hand scene rendering out of `web/src/main.jsx`.
-- [ ] Split tab panels into focused components after playback state is stable.
+- [x] Split tab panels into focused components after playback state is stable.
 - [x] Add regression checks for tab labels, current runtime IO order, prediction row display, and runtime/prediction alignment.
 - [x] Re-run web build, SSE check, realtime flow check, and restart the local tmux demo.
 
 ## Pending Model Discussion
 
-- [ ] Replace the lightweight bootstrap prior with a fuller learned model.
+- [x] Replace the lightweight bootstrap prior with a fuller learned model.

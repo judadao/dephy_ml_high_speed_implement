@@ -223,7 +223,7 @@ items:
     status: done
   - id: web_tab_panel_components
     title: Split tab panels into focused components after playback state is stable
-    status: pending
+    status: done
   - id: web_tab_regression_checks
     title: Add regression checks for tab contracts and runtime/prediction alignment
     status: done
@@ -232,4 +232,4 @@ items:
     status: done
   - id: learned_bootstrap_model
     title: Replace lightweight bootstrap prior with fuller learned model
-    status: pending_discussion
+    status: done

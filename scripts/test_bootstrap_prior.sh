@@ -19,6 +19,9 @@ python3 scripts/train_bootstrap_prior.py \
     --model-in "$model_dir/model.json" \
     --model-out "$outdir/model_with_prior.json" > "$outdir/prior_metrics.json"
 
-grep -q '"format": "dephy_bootstrap_prior_v1"' "$outdir/model_with_prior.json"
+grep -q '"format": "dephy_bootstrap_prior_v2"' "$outdir/model_with_prior.json"
 grep -q '"bootstrap_prior"' "$outdir/model_with_prior.json"
 grep -q '"samples": 2' "$outdir/model_with_prior.json"
+grep -q '"std_delta"' "$outdir/model_with_prior.json"
+grep -q '"confidence_by_axis"' "$outdir/model_with_prior.json"
+grep -q '"mean_delta"' "$outdir/model_with_prior.json"

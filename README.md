@@ -451,9 +451,11 @@ python3 scripts/train_bootstrap_prior.py \
   --model-out build_out/hand_sequence/model_with_prior.json
 ```
 
-The watcher will use `bootstrap_prior.mean_delta` when the loaded model has
-that field. This improves the first "only A exists" guess without changing the
-confirmed A-to-B endpoint contract.
+The trainer exports a `dephy_bootstrap_prior_v2` statistical prior with
+positive/negative counts, mean/std deltas, p95 error, and per-axis confidence.
+The watcher remains compatible by reading `bootstrap_prior.mean_delta` when the
+loaded model has that field. This improves the first "only A exists" guess
+without changing the confirmed A-to-B endpoint contract.
 
 Bridge from the sibling IO simulator when it is available:
 

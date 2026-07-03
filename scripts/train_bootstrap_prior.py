@@ -19,6 +19,21 @@ def mean(values: list[float]) -> float:
     return sum(values) / max(len(values), 1)
 
 
+def stddev(values: list[float]) -> float:
+    if len(values) < 2:
+        return 0.0
+    avg = mean(values)
+    return (sum((value - avg) ** 2 for value in values) / (len(values) - 1)) ** 0.5
+
+
+def percentile(values: list[float], pct: float) -> float:
+    if not values:
+        return 1.0
+    ordered = sorted(values)
+    index = min(len(ordered) - 1, max(0, int(round((len(ordered) - 1) * pct))))
+    return ordered[index]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--samples", required=True)
@@ -29,14 +44,15 @@ def main() -> int:
 
     rows = load_jsonl(Path(args.samples))
     model = json.loads(Path(args.model_in).read_text())
-    usable = [
+    all_samples = [row for row in rows if row.get("format") == "dephy_bootstrap_prior_sample_v1"]
+    positives = [
         row
         for row in rows
         if row.get("format") == "dephy_bootstrap_prior_sample_v1"
         and float(row.get("metrics", {}).get("target_error", 1.0)) <= args.max_positive_error
     ]
-    if not usable:
-        usable = [row for row in rows if row.get("format") == "dephy_bootstrap_prior_sample_v1"]
+    negatives = [row for row in all_samples if row not in positives]
+    usable = positives or all_samples
 
     deltas = []
     errors = []
@@ -47,13 +63,22 @@ def main() -> int:
         errors.append(float(row.get("metrics", {}).get("target_error", 1.0)))
 
     mean_delta = [mean([delta[index] for delta in deltas]) for index in range(7)] if deltas else [0.0, 0.006, 0.0, 0.0, 0.0, 0.0, 0.08]
+    std_delta = [stddev([delta[index] for delta in deltas]) for index in range(7)] if deltas else [0.0] * 7
     avg_error = mean(errors) if errors else 1.0
+    p95_error = percentile(errors, 0.95)
+    confidence_by_axis = [max(0.1, min(0.98, 1.0 - value * 8.0 - avg_error * 2.0)) for value in std_delta]
     model["bootstrap_prior"] = {
-        "format": "dephy_bootstrap_prior_v1",
+        "format": "dephy_bootstrap_prior_v2",
         "samples": len(usable),
+        "positive_samples": len(positives),
+        "negative_samples": len(negatives),
         "mean_delta": mean_delta,
+        "std_delta": std_delta,
         "avg_target_error": avg_error,
-        "confidence": max(0.15, min(0.95, 1.0 - avg_error * 8.0)),
+        "p95_target_error": p95_error,
+        "confidence": max(0.15, min(0.95, 1.0 - avg_error * 8.0 - mean(std_delta) * 2.0)),
+        "confidence_by_axis": confidence_by_axis,
+        "selection": "positive_below_threshold" if positives else "all_samples_fallback",
     }
     Path(args.model_out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.model_out).write_text(json.dumps(model, indent=2, sort_keys=True) + "\n")
