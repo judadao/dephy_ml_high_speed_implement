@@ -40,55 +40,55 @@ items:
     status: done
   - id: cyclic_synthetic_v1
     title: Implement cyclic_io_synthetic_v1 benchmark cases
-    status: pending
+    status: done
   - id: cyclic_dataset_generation
     title: Generate positive, negative, and test datasets following cyclic_io_dataset_design.md
-    status: pending
+    status: done
   - id: cyclic_case_metadata_parser
     title: Add case metadata parser and validator
-    status: pending
+    status: done
   - id: cyclic_snapshot_parser
     title: Add snapshot parser and validator
-    status: pending
+    status: done
   - id: cyclic_raw_event_parser
     title: Add raw cyclic IO event row parser
-    status: pending
+    status: done
   - id: cyclic_vector_frame_builder
     title: Add normalized fixed-vector frame builder with analog normalization and missing-value masks
-    status: pending
+    status: done
   - id: cyclic_phase_normalization
     title: Implement cycle phase normalization and period detection
-    status: pending
+    status: done
   - id: cyclic_few_shot_dataset
     title: Build few-shot fine-tune dataset format from positive periodic samples
-    status: pending
+    status: done
   - id: cyclic_training_targets
     title: Add phase, snapshot, trajectory, endpoint, smoothness, and noisy convergence training targets
-    status: pending
+    status: done
   - id: cyclic_phase_snapshot_estimator
     title: Estimate phase and nearest snapshot from noisy runtime IO
-    status: pending
+    status: done
   - id: cyclic_1000_frame_predictor
     title: Generate 1000 phase-normalized IO prediction frames per cycle or transition
-    status: pending
+    status: done
   - id: cyclic_prediction_converter
     title: Convert normalized prediction vectors to case-specific slot/channel/value records
-    status: pending
+    status: done
   - id: cyclic_runtime_buffer_correction
     title: Add runtime prediction buffer correction and re-anchor metadata
-    status: pending
+    status: done
   - id: cyclic_rule_engine
     title: Add deterministic fail-safe rule engine for hard, soft, and warning violations
-    status: pending
+    status: done
   - id: cyclic_convergence_validation
     title: Validate noisy runtime IO convergence to target snapshots
-    status: pending
+    status: done
   - id: cyclic_inference_benchmark
     title: Benchmark runtime inference latency and prediction throughput
-    status: pending
+    status: done
   - id: cyclic_result_metrics_writer
     title: Add result metrics writer for snapshot, phase, smoothness, latency, and accepted/rejected status
-    status: pending
+    status: done
   - id: cyclic_io_device_e2e
     title: Add linux_io_device_simul generic IO to cyclic prediction e2e flow
     status: pending

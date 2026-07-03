@@ -66,10 +66,43 @@ or IO updates provide reality checks, while the local predictor fills the gap.
 make -f Makefile.linux
 make -f Makefile.linux test
 make -f Makefile.linux hand-rl-check
+make -f Makefile.linux cyclic-io-check
 make -f Makefile.linux demo
 make -f Makefile.linux web-install
 make -f Makefile.linux web
 ```
+
+## Cyclic IO Synthetic Engine
+
+The generic cyclic IO implementation starts with a deterministic synthetic
+contract. It generates the `cyclic_io_synthetic_v1` benchmark, validates schema,
+snapshots, normalized vectors, 1000-frame prediction, rule checks, convergence
+metrics, and inference latency:
+
+```sh
+make -f Makefile.linux cyclic-io-check
+```
+
+Generate the dataset manually:
+
+```sh
+python3 scripts/generate_cyclic_io_dataset.py \
+  --out build_out/cyclic_io \
+  --count 3 \
+  --seed 1001
+```
+
+Validate it:
+
+```sh
+python3 scripts/validate_cyclic_io_dataset.py \
+  --root build_out/cyclic_io/cyclic_io_synthetic_v1 \
+  --result build_out/cyclic_io/result.json
+```
+
+The first implementation is deliberately deterministic. It establishes the
+data contracts, vectorization, conversion, rule engine, correction metadata,
+and metrics that a learned model will later plug into.
 
 ## Single Palm Keyframe Prediction
 

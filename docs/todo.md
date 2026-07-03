@@ -29,23 +29,23 @@ contracts:
 
 ## Cyclic IO Implementation TODO
 
-- [ ] Implement `cyclic_io_synthetic_v1` benchmark cases.
-- [ ] Generate positive, negative, and test datasets following `cyclic_io_dataset_design.md`.
-- [ ] Add case metadata parser and validator.
-- [ ] Add snapshot parser and validator.
-- [ ] Add raw event row parser for `sample_id,t_ms,cycle_id,phase,io_type,slot,channel,value,status,source`.
-- [ ] Add normalized fixed-vector frame builder with analog normalization and missing-value masks.
-- [ ] Implement cycle phase normalization and cycle-period detection.
-- [ ] Build the few-shot fine-tune dataset format for positive periodic samples.
-- [ ] Add model training targets for phase, snapshot, trajectory, endpoint, smoothness, and noisy convergence losses.
-- [ ] Implement phase + nearest-snapshot estimation for noisy runtime IO.
-- [ ] Implement 1000-frame phase-normalized IO trajectory generation.
-- [ ] Add repository converter from normalized prediction vectors to case-specific slot/channel/value records.
-- [ ] Add runtime prediction buffer correction and re-anchor metadata.
-- [ ] Add deterministic fail-safe/rule engine for hard, soft, and warning violations.
-- [ ] Add convergence validation for noisy runtime IO against target snapshots.
-- [ ] Add performance benchmark for inference latency and prediction throughput.
-- [ ] Add result metrics writer for snapshot, phase, smoothness, latency, and accepted/rejected status.
+- [x] Implement `cyclic_io_synthetic_v1` benchmark cases.
+- [x] Generate positive, negative, and test datasets following `cyclic_io_dataset_design.md`.
+- [x] Add case metadata parser and validator.
+- [x] Add snapshot parser and validator.
+- [x] Add raw event row parser for `sample_id,t_ms,cycle_id,phase,io_type,slot,channel,value,status,source`.
+- [x] Add normalized fixed-vector frame builder with analog normalization and missing-value masks.
+- [x] Implement cycle phase normalization and cycle-period detection.
+- [x] Build the few-shot fine-tune dataset format for positive periodic samples.
+- [x] Add model training targets for phase, snapshot, trajectory, endpoint, smoothness, and noisy convergence losses.
+- [x] Implement phase + nearest-snapshot estimation for noisy runtime IO.
+- [x] Implement 1000-frame phase-normalized IO trajectory generation.
+- [x] Add repository converter from normalized prediction vectors to case-specific slot/channel/value records.
+- [x] Add runtime prediction buffer correction and re-anchor metadata.
+- [x] Add deterministic fail-safe/rule engine for hard, soft, and warning violations.
+- [x] Add convergence validation for noisy runtime IO against target snapshots.
+- [x] Add performance benchmark for inference latency and prediction throughput.
+- [x] Add result metrics writer for snapshot, phase, smoothness, latency, and accepted/rejected status.
 - [ ] Add cross-repo flow from `linux_io_device_simul` generic IO samples into the cyclic IO engine.
 
 ## Completed Single Palm Keyframe RL
