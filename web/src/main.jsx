@@ -537,7 +537,7 @@ function App() {
 
   return (
     <main className="app-shell">
-      <DemoHeader running={running} onReset={resetDemo} onTogglePlayback={togglePlayback} />
+      <DemoHeader playDisabled={playMode === PLAY_MODES.ANCHORS} running={running} onReset={resetDemo} onTogglePlayback={togglePlayback} />
 
       <section className="stage-row">
         <HandScene frame={frame} ready={Boolean(frame && keyframes.length > 0)} />

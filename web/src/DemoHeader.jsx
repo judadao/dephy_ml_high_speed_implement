@@ -1,6 +1,7 @@
 import { Pause, Play, RotateCcw } from "lucide-react";
 
-export function DemoHeader({ running, onReset, onTogglePlayback }) {
+export function DemoHeader({ playDisabled = false, running, onReset, onTogglePlayback }) {
+  const playLabel = playDisabled ? "Manual" : running ? "Pause" : "Play";
   return (
     <section className="hero">
       <div>
@@ -8,9 +9,9 @@ export function DemoHeader({ running, onReset, onTogglePlayback }) {
         <h1>Hand Prediction Demo</h1>
       </div>
       <div className="hero-actions">
-        <button type="button" onClick={onTogglePlayback} title={running ? "Pause" : "Play"}>
-          {running ? <Pause size={18} /> : <Play size={18} />}
-          <span>{running ? "Pause" : "Play"}</span>
+        <button type="button" onClick={onTogglePlayback} title={playDisabled ? "Anchors are manual review only" : playLabel} disabled={playDisabled}>
+          {running && !playDisabled ? <Pause size={18} /> : <Play size={18} />}
+          <span>{playLabel}</span>
         </button>
         <button type="button" onClick={onReset} title="Reset demo">
           <RotateCcw size={18} />

@@ -49,6 +49,8 @@ grep -Fq 'export function AnchorsTab' web/src/AnchorsTab.jsx
 grep -Fq 'export function PlaybackToolbar' web/src/PlaybackToolbar.jsx
 grep -Fq 'export function MetricsPanels' web/src/MetricsPanels.jsx
 grep -Fq 'export function DemoHeader' web/src/DemoHeader.jsx
+grep -Fq 'disabled={playDisabled}' web/src/DemoHeader.jsx
+grep -Fq 'playDisabled={playMode === PLAY_MODES.ANCHORS}' web/src/main.jsx
 grep -Fq 'from "./RealtimeDemoTab.jsx"' web/src/main.jsx
 grep -Fq 'from "./DeviceIoPanel.jsx"' web/src/RealtimeDemoTab.jsx
 grep -Fq 'from "./PredictionTab.jsx"' web/src/main.jsx
