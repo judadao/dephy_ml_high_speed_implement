@@ -11,7 +11,7 @@ import { activeFrameIndexForSegment, activeSegmentIndexForFrame, currentRuntimeA
 import { ANCHOR_MS, DEFAULT_POLICY, DEMO_RECORD_LIMIT, KEYFRAME_URL, PLAY_MODES, POLICY_URL, PREDICTION_WINDOW_AFTER, PREDICTION_WINDOW_BEFORE, RENDER_MS, RESULT_URL, RUNTIME_ANCHORS_URL, SAMPLE_KEYFRAME_URL, SEGMENTS_URL, TAB_CONTRACTS, UI_UPDATE_MS, VISIBLE_ROW_LIMIT } from "./demoConstants.js";
 import { flattenPredictionSegments, formatPredictionCsvRow, frameFromKeyframe, makeFrameState, parseCsv, parsePredictionSegmentsJsonl, parseRuntimeAnchorsJsonl } from "./demoData.js";
 import { anchorFrameAt, predictionFrameForAnchor } from "./manualPlayback.js";
-import { resumePlaybackAtCurrentFrame, segmentDurationMs } from "./playbackTiming.js";
+import { nextSegmentPlayback, shouldRunPlayback, startPlaybackState } from "./playbackController.js";
 import { connectDemoEvents, fetchInitialDemoData } from "./demoTransport.js";
 import "./styles.css";
 
@@ -224,7 +224,7 @@ function App() {
   }, [playMode]);
 
   useEffect(() => {
-    if (!running || !playbackReady) {
+    if (!shouldRunPlayback({ playMode, running, playbackReady })) {
       return undefined;
     }
     const timer = window.setInterval(() => {
@@ -232,60 +232,16 @@ function App() {
       if (liveKeyframes.length === 0) {
         return;
       }
-      if (playMode === PLAY_MODES.ANCHORS) {
-        return;
-      }
-
       const segments = predictionSegmentsRef.current;
       if (segments.length > 0) {
         const now = performance.now();
-        let playback = segmentPlaybackRef.current;
-        let segment = segments[playback.segmentIndex] || segments[0];
-        if (segment.frames.length === 0) {
+        const advanced = nextSegmentPlayback({ segments, playback: segmentPlaybackRef.current, now });
+        segmentPlaybackRef.current = advanced.playback;
+        if (!advanced.frame) {
           return;
         }
-        let segmentDuration = segmentDurationMs(segment);
-        let elapsed = now - playback.startTime;
-        while (elapsed >= segmentDuration) {
-          if (playback.segmentIndex >= segments.length - 1) {
-            const lastFrameIndex = segment.frames.length - 1;
-            if (playback.lastFrameIndex !== lastFrameIndex) {
-              const nextFrame = segment.frames[lastFrameIndex];
-              const previous = frameRef.current;
-              const next = makeFrameState(nextFrame, previous, sequenceResultRef.current);
-              next.anchorLoop = 1;
-              frameRef.current = next;
-              if (now - lastUiUpdateRef.current >= UI_UPDATE_MS) {
-                lastUiUpdateRef.current = now;
-                setFrame(next);
-              }
-              segmentPlaybackRef.current = { ...playback, lastFrameIndex };
-            }
-            return;
-          }
-          const nextSegmentIndex = playback.segmentIndex + 1;
-          const overflow = elapsed - segmentDuration;
-          playback = { segmentIndex: nextSegmentIndex, startTime: now - overflow, lastFrameIndex: -1 };
-          segmentPlaybackRef.current = playback;
-          segment = segments[nextSegmentIndex];
-          if (segment.frames.length === 0) {
-            return;
-          }
-          segmentDuration = segmentDurationMs(segment);
-          elapsed = overflow;
-          if (elapsed < segmentDuration) {
-            break;
-          }
-        }
-        const ratio = Math.max(0, Math.min(elapsed / segmentDuration, 1));
-        const frameIndex = Math.min(segment.frames.length - 1, Math.floor(ratio * segment.frames.length));
-        if (frameIndex === playback.lastFrameIndex) {
-          return;
-        }
-        segmentPlaybackRef.current = { ...playback, lastFrameIndex: frameIndex };
-        const nextFrame = segment.frames[frameIndex];
         const previous = frameRef.current;
-        const next = makeFrameState(nextFrame, previous, sequenceResultRef.current);
+        const next = makeFrameState(advanced.frame, previous, sequenceResultRef.current);
         next.anchorLoop = 1;
         frameRef.current = next;
         if (now - lastUiUpdateRef.current >= UI_UPDATE_MS) {
@@ -315,23 +271,19 @@ function App() {
   }
 
   function startPlayback() {
-    if (playMode === PLAY_MODES.ANCHORS) {
-      setRunning(false);
+    const segments = predictionSegmentsRef.current;
+    const now = performance.now();
+    const playback = segmentPlaybackRef.current;
+    const segment = segments[playback.segmentIndex] || segments[0];
+    const next = startPlaybackState({ playMode, playback, segment, segmentCount: segments.length, now });
+    segmentPlaybackRef.current = next.playback;
+    setRunning(next.running);
+    if (!next.running) {
       return;
     }
-    const segments = predictionSegmentsRef.current;
     if (segments.length > 0) {
-      const now = performance.now();
-      const playback = segmentPlaybackRef.current;
-      const segment = segments[playback.segmentIndex] || segments[0];
-      const isAtEnd = segment && playback.lastFrameIndex >= segment.frames.length - 1 && playback.segmentIndex >= segments.length - 1;
-      if (isAtEnd) {
-        segmentPlaybackRef.current = { segmentIndex: 0, startTime: now, lastFrameIndex: -1 };
-      } else {
-        segmentPlaybackRef.current = resumePlaybackAtCurrentFrame({ playback, segment, now });
-      }
+      lastUiUpdateRef.current = 0;
     }
-    setRunning(true);
   }
 
   function togglePlayback() {
@@ -537,7 +489,7 @@ function App() {
 
   return (
     <main className="app-shell">
-      <DemoHeader playDisabled={playMode === PLAY_MODES.ANCHORS} running={running} onReset={resetDemo} onTogglePlayback={togglePlayback} />
+      <DemoHeader playMode={playMode} running={running} onReset={resetDemo} onTogglePlayback={togglePlayback} />
 
       <section className="stage-row">
         <HandScene frame={frame} ready={Boolean(frame && keyframes.length > 0)} />

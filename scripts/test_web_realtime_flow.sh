@@ -49,8 +49,11 @@ grep -Fq 'export function AnchorsTab' web/src/AnchorsTab.jsx
 grep -Fq 'export function PlaybackToolbar' web/src/PlaybackToolbar.jsx
 grep -Fq 'export function MetricsPanels' web/src/MetricsPanels.jsx
 grep -Fq 'export function DemoHeader' web/src/DemoHeader.jsx
-grep -Fq 'disabled={playDisabled}' web/src/DemoHeader.jsx
-grep -Fq 'playDisabled={playMode === PLAY_MODES.ANCHORS}' web/src/main.jsx
+grep -Fq 'playButtonState({ playMode, running })' web/src/DemoHeader.jsx
+grep -Fq 'shouldRunPlayback({ playMode, running, playbackReady })' web/src/main.jsx
+grep -Fq 'nextSegmentPlayback({ segments, playback: segmentPlaybackRef.current, now })' web/src/main.jsx
+grep -Fq 'startPlaybackState({ playMode' web/src/main.jsx
+node scripts/test_web_playback_controller.mjs
 grep -Fq 'from "./RealtimeDemoTab.jsx"' web/src/main.jsx
 grep -Fq 'from "./DeviceIoPanel.jsx"' web/src/RealtimeDemoTab.jsx
 grep -Fq 'from "./PredictionTab.jsx"' web/src/main.jsx
@@ -60,14 +63,12 @@ grep -Fq 'from "./MetricsPanels.jsx"' web/src/main.jsx
 grep -Fq 'from "./DemoHeader.jsx"' web/src/main.jsx
 grep -Fq 'from "./manualPlayback.js"' web/src/main.jsx
 grep -Fq 'from "./demoDisplay.js"' web/src/main.jsx
-grep -Fq 'from "./playbackTiming.js"' web/src/main.jsx
+grep -Fq 'from "./playbackController.js"' web/src/main.jsx
 grep -Fq 'from "./demoTransport.js"' web/src/main.jsx
 grep -Fq 'export function anchorFrameAt' web/src/manualPlayback.js
-grep -Fq 'export function advanceAnchorPlayback' web/src/manualPlayback.js
 grep -Fq 'export function predictionFrameForAnchor' web/src/manualPlayback.js
 grep -Fq 'export function currentRuntimeAnchorIndexForDisplay' web/src/demoDisplay.js
 grep -Fq 'export function predictionFrameWindow' web/src/demoDisplay.js
-grep -Fq 'export function resumePlaybackAtCurrentFrame' web/src/playbackTiming.js
 grep -Fq 'export function fetchInitialDemoData' web/src/demoTransport.js
 grep -Fq 'export function connectDemoEvents' web/src/demoTransport.js
 grep -Fq 'connectDemoEvents({' web/src/main.jsx
@@ -78,11 +79,11 @@ grep -Fq 'anchorPlaybackRef' web/src/main.jsx
 grep -Fq 'keyframesRef.current' web/src/main.jsx
 grep -Fq 'sequenceResultRef.current' web/src/main.jsx
 grep -Fq '}, [playMode, running, playbackReady]);' web/src/main.jsx
-grep -Fq 'pausedFrameIndex / segment.frames.length' web/src/playbackTiming.js
+grep -Fq 'pausedFrameIndex / segment.frames.length' web/src/playbackController.js
 grep -Fq 'if (playMode === PLAY_MODES.ANCHORS) {' web/src/main.jsx
 grep -Fq 'setRunning(false);' web/src/main.jsx
 grep -Fq 'return;' web/src/main.jsx
-if grep -Fq 'advanceAnchorPlayback({' web/src/main.jsx; then
+if rg -q 'advanceAnchorPlayback' web/src; then
     echo "anchors tab should not auto-replay anchors" >&2
     exit 1
 fi
