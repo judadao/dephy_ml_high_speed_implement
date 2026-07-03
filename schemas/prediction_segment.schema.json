@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dephy.local/schemas/prediction_segment.schema.json",
+  "title": "Dephy Prediction Segment",
+  "type": "object",
+  "required": [
+    "format",
+    "segment_index",
+    "segment_type",
+    "from",
+    "to",
+    "frames_between_keyframes",
+    "confidence",
+    "frames"
+  ],
+  "properties": {
+    "format": { "const": "dephy_prediction_segment_v1" },
+    "segment_index": { "type": "integer", "minimum": 0 },
+    "segment_type": { "enum": ["bootstrap", "confirmed", "correction"] },
+    "source": { "type": "string" },
+    "from": { "$ref": "#/$defs/endpoint" },
+    "to": { "$ref": "#/$defs/endpoint" },
+    "start_t_ms": { "type": "integer", "minimum": 0 },
+    "target_t_ms": { "type": "integer", "minimum": 0 },
+    "frames_between_keyframes": { "type": "integer", "minimum": 0 },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "is_predicted_target": { "type": "boolean" },
+    "is_corrected": { "type": "boolean" },
+    "frames": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/frame" }
+    }
+  },
+  "$defs": {
+    "endpoint": {
+      "type": "object",
+      "required": ["frame_id", "t_ms"],
+      "properties": {
+        "frame_id": { "type": "string" },
+        "t_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "frame": {
+      "type": "object",
+      "required": ["csvLine", "frame_t_ms", "target_frame", "palm_x", "palm_y", "palm_z", "yaw", "pitch", "roll", "grip"],
+      "properties": {
+        "csvLine": { "type": "integer", "minimum": 1 },
+        "frame_t_ms": { "type": "number", "minimum": 0 },
+        "target_frame": { "type": "string" },
+        "palm_x": { "type": "number" },
+        "palm_y": { "type": "number" },
+        "palm_z": { "type": "number" },
+        "yaw": { "type": "number" },
+        "pitch": { "type": "number" },
+        "roll": { "type": "number" },
+        "grip": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

@@ -59,3 +59,30 @@ items:
   - id: ml_hsi_residual_learning
     title: Add residual learner with confidence and fallback behavior
     status: done
+  - id: realtime_append_watcher
+    title: Add append-style realtime keyframe watcher
+    status: done
+  - id: realtime_segment_types
+    title: Generate bootstrap, confirmed, and correction segments
+    status: done
+  - id: realtime_resume_partial_write
+    title: Support resume and partial CSV append robustness
+    status: done
+  - id: realtime_result_heartbeat
+    title: Emit realtime result heartbeat and counters
+    status: done
+  - id: realtime_bootstrap_prior
+    title: Record bootstrap samples and train a lightweight prior
+    status: done
+  - id: realtime_schema_contracts
+    title: Add realtime JSON schemas
+    status: done
+  - id: realtime_service_wrapper
+    title: Add local Linux service wrapper
+    status: done
+  - id: realtime_io_device_bridge
+    title: Add sibling io-device simulator bridge script
+    status: done
+  - id: realtime_web_queue
+    title: Update web to play growing JSONL segments and counters
+    status: done

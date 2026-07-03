@@ -12,7 +12,7 @@ KEYFRAME_MODE ?= grasp_can
 LIB := $(OUTDIR)/libdephy_ml_high_speed_implement.a
 OBJS := $(OUTDIR)/src/bitmap_anim.o $(OUTDIR)/src/joint_predictor.o $(OUTDIR)/src/hand_predictor.o
 
-.PHONY: all structure-audit direct-test test hand-rl-check hand-sequence-check hand-realtime-check io-device-pipeline-check zephyr-metadata demo web-demo-data web-realtime-demo-data web-sequence-demo-loop web-install web-build web web-render-check clean
+.PHONY: all structure-audit direct-test test hand-rl-check hand-sequence-check hand-realtime-check bootstrap-prior-check io-device-pipeline-check zephyr-metadata demo web-demo-data web-realtime-demo-data web-realtime-service web-sequence-demo-loop web-install web-build web web-render-check clean
 
 all: $(LIB) $(OUTDIR)/dephy_bitmap_anim $(OUTDIR)/dephy_joint_replay $(OUTDIR)/dephy_hand_predict
 
@@ -74,6 +74,10 @@ hand-sequence-check:
 
 hand-realtime-check:
 	OUTDIR=$(OUTDIR) sh scripts/test_hand_realtime_watcher.sh
+	python3 scripts/test_realtime_schemas.py
+
+bootstrap-prior-check:
+	OUTDIR=$(OUTDIR) sh scripts/test_bootstrap_prior.sh
 
 web-sequence-demo-loop:
 	FRAMES=$(FRAMES) KEYFRAME_COUNT=$(KEYFRAME_COUNT) KEYFRAME_MODE=$(KEYFRAME_MODE) NOISE_SCALE=$(NOISE_SCALE) sh scripts/run_hand_sequence_realtime_demo.sh
@@ -102,6 +106,9 @@ web-realtime-demo-data:
 	if [ ! -f $(OUTDIR)/hand_sequence/model.json ]; then OUTDIR=$(OUTDIR) sh scripts/test_hand_sequence_model.sh >/dev/null; fi
 	KEYFRAME_COUNT=$(KEYFRAME_COUNT) SAMPLE_MS=300 WEB_SEED=$(WEB_SEED) NOISE_SCALE=$(NOISE_SCALE) KEYFRAME_MODE=$(KEYFRAME_MODE) LOOP=1 OUTDIR=$(OUTDIR) sh scripts/run_hand_realtime_keyframe_simul.sh web/public/demo/hand_keyframes.csv &
 	python3 scripts/dephy_hand_realtime_watcher.py --keyframes web/public/demo/hand_keyframes.csv --model $(OUTDIR)/hand_sequence/model.json --out web/public/demo/hand_sequence/prediction_segments.jsonl --result web/public/demo/hand_sequence/result.json --render-ms 16 --sample-ms 300 --frames $(FRAMES) --max-keyframes $(KEYFRAME_COUNT) --truncate
+
+web-realtime-service:
+	OUTDIR=$(OUTDIR) FRAMES=$(FRAMES) sh scripts/run_hand_realtime_service.sh
 
 web-build: web-demo-data
 	npm --prefix web run build

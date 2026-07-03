@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dephy.local/schemas/realtime_result.schema.json",
+  "title": "Dephy Realtime Prediction Result",
+  "type": "object",
+  "required": [
+    "format",
+    "mode",
+    "state",
+    "keyframes_seen",
+    "segments_written",
+    "bootstrap_segments",
+    "confirmed_segments",
+    "correction_segments",
+    "prediction_frames",
+    "success"
+  ],
+  "properties": {
+    "format": { "const": "dephy_realtime_prediction_result_v1" },
+    "mode": { "const": "realtime" },
+    "state": { "enum": ["running", "stopped"] },
+    "model": { "type": ["string", "null"] },
+    "updated_at_ms": { "type": "integer", "minimum": 0 },
+    "keyframes_seen": { "type": "integer", "minimum": 0 },
+    "segments_written": { "type": "integer", "minimum": 0 },
+    "bootstrap_segments": { "type": "integer", "minimum": 0 },
+    "confirmed_segments": { "type": "integer", "minimum": 0 },
+    "correction_segments": { "type": "integer", "minimum": 0 },
+    "last_keyframe": { "type": ["string", "null"] },
+    "last_segment_type": { "enum": ["bootstrap", "confirmed", "correction", null] },
+    "prediction_frames": { "type": "integer", "minimum": 0 },
+    "frames_between_keyframes": { "type": "integer", "minimum": 0 },
+    "render_ms": { "type": "integer", "minimum": 1 },
+    "last_error": { "type": "number", "minimum": 0 },
+    "max_position_jump": { "type": "number", "minimum": 0 },
+    "max_rotation_jump": { "type": "number", "minimum": 0 },
+    "max_grip_jump": { "type": "number", "minimum": 0 },
+    "success": { "type": "boolean" }
+  }
+}

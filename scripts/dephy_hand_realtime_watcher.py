@@ -7,6 +7,7 @@ import argparse
 import csv
 import json
 import time
+from json import JSONDecodeError
 from pathlib import Path
 
 from dephy_hand_sequence_predict import exact_smooth_segment, motion_metrics
@@ -23,19 +24,39 @@ def load_model(path: Path) -> dict:
 def load_keyframes(path: Path) -> list[dict]:
     if not path.exists() or path.stat().st_size == 0:
         return []
-    with path.open(newline="") as fp:
+    text = path.read_text()
+    if not text.strip():
+        return []
+    lines = text.splitlines()
+    if text and not text.endswith(("\n", "\r")) and len(lines) > 1:
+        lines = lines[:-1]
+    with lines_to_reader(lines) as reader:
         rows = []
-        for row in csv.DictReader(fp):
+        for row in reader:
             if not row.get("frame_id"):
                 continue
-            rows.append(
-                {
-                    "frame_id": row["frame_id"],
-                    "t_ms": int(float(row["t_ms"])),
-                    "pose": [float(row[field]) for field in FIELDS],
-                }
-            )
+            try:
+                rows.append(
+                    {
+                        "frame_id": row["frame_id"],
+                        "t_ms": int(float(row["t_ms"])),
+                        "pose": [float(row[field]) for field in FIELDS],
+                    }
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
         return rows
+
+
+class lines_to_reader:
+    def __init__(self, lines: list[str]):
+        self.lines = lines
+
+    def __enter__(self):
+        return csv.DictReader(self.lines)
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
 
 
 def pose_to_keyframe(frame_id: str, t_ms: int, pose: list[float]) -> dict:
@@ -46,13 +67,19 @@ def pose_to_keyframe(frame_id: str, t_ms: int, pose: list[float]) -> dict:
     }
 
 
-def extrapolate_target(keyframes: list[dict], sample_ms: int, segment_index: int) -> dict:
+def extrapolate_target(keyframes: list[dict], sample_ms: int, segment_index: int, model: dict | None = None) -> dict:
     current = keyframes[-1]
     target_t = current["t_ms"] + sample_ms
     if len(keyframes) >= 2:
         previous = keyframes[-2]
         scale = sample_ms / max(current["t_ms"] - previous["t_ms"], 1)
         pose = [current["pose"][axis] + (current["pose"][axis] - previous["pose"][axis]) * scale for axis in range(7)]
+        pose[6] = max(0.0, min(1.0, pose[6]))
+    elif model and model.get("bootstrap_prior"):
+        prior = model["bootstrap_prior"]
+        delta = prior.get("mean_delta", [0.0] * 7)
+        confidence = max(0.0, min(1.0, float(prior.get("confidence", 0.35))))
+        pose = [current["pose"][axis] + float(delta[axis]) * confidence for axis in range(7)]
         pose[6] = max(0.0, min(1.0, pose[6]))
     else:
         pose = current["pose"][:]
@@ -133,6 +160,60 @@ def write_result(path: Path, result: dict) -> None:
     tmp.replace(path)
 
 
+def load_existing_segments(path: Path) -> list[dict]:
+    if not path.exists() or path.stat().st_size == 0:
+        return []
+    segments = []
+    for line in path.read_text().splitlines():
+        if not line.strip():
+            continue
+        try:
+            segments.append(json.loads(line))
+        except JSONDecodeError:
+            break
+    return segments
+
+
+def resume_state(segments: list[dict]) -> tuple[int, int, int, bool, list[float] | None]:
+    if not segments:
+        return 0, 2, 0, False, None
+    segment_index = max(int(segment.get("segment_index", -1)) for segment in segments) + 1
+    csv_line = 2
+    processed_pairs = 0
+    bootstrap_written = False
+    bootstrap_pose = None
+    for segment in segments:
+        frames = segment.get("frames", [])
+        if frames:
+            csv_line = max(csv_line, max(int(frame.get("csvLine", 1)) for frame in frames) + 1)
+        segment_type = segment.get("segment_type", "confirmed")
+        if segment_type == "bootstrap":
+            bootstrap_written = True
+            if frames:
+                bootstrap_pose = pose_from_frame(frames[-1])
+        elif segment_type == "confirmed":
+            processed_pairs += 1
+    return processed_pairs, csv_line, segment_index, bootstrap_written, bootstrap_pose
+
+
+def append_bootstrap_sample(path: Path | None, start: dict, predicted: dict, actual: dict, error: float) -> None:
+    if path is None:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    label = "positive" if error <= 0.02 else "negative"
+    row = {
+        "format": "dephy_bootstrap_prior_sample_v1",
+        "label": label,
+        "start": start["pose"],
+        "predicted_target": predicted["pose"],
+        "actual_target": actual["pose"],
+        "sample_ms": actual["t_ms"] - start["t_ms"],
+        "metrics": {"target_error": error},
+    }
+    with path.open("a") as fp:
+        fp.write(json.dumps(row, separators=(",", ":"), sort_keys=True) + "\n")
+
+
 def pose_from_frame(frame: dict) -> list[float]:
     return [frame["palm_x"], frame["palm_y"], frame["palm_z"], frame["yaw"], frame["pitch"], frame["roll"], frame["grip"]]
 
@@ -155,6 +236,7 @@ def update_result(
     last_error: float,
     render_ms: int,
     frames_between: int,
+    state: str = "running",
 ) -> None:
     counts = {"bootstrap": 0, "confirmed": 0, "correction": 0}
     for segment in segments:
@@ -177,6 +259,8 @@ def update_result(
             "prediction_frames": sum(len(segment["frames"]) for segment in segments),
             "frames_between_keyframes": frames_between,
             "render_ms": render_ms,
+            "state": state,
+            "updated_at_ms": int(time.time() * 1000),
             "last_error": last_error,
             **metrics,
             "success": last_error <= 0.000001 and metrics["max_position_jump"] <= 0.03 and metrics["max_rotation_jump"] <= 0.08 and metrics["max_grip_jump"] <= 0.08,
@@ -197,6 +281,8 @@ def main() -> int:
     parser.add_argument("--max-keyframes", type=int)
     parser.add_argument("--idle-exit-ms", type=int, help="exit after this much idle time once at least one keyframe was seen")
     parser.add_argument("--truncate", action="store_true", help="truncate output and result before watching")
+    parser.add_argument("--resume", action="store_true", help="resume from existing prediction_segments.jsonl")
+    parser.add_argument("--bootstrap-samples", help="append bootstrap prior fine-tuning samples here")
     parser.add_argument("--correction-threshold", type=float, default=0.02)
     args = parser.parse_args()
 
@@ -204,19 +290,17 @@ def main() -> int:
     keyframe_path = Path(args.keyframes)
     out_path = Path(args.out)
     result_path = Path(args.result)
+    if args.truncate and args.resume:
+        raise ValueError("--truncate and --resume cannot be used together")
     if args.truncate:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text("")
         result_path.parent.mkdir(parents=True, exist_ok=True)
         result_path.write_text("")
 
-    processed_pairs = 0
+    written_segments = load_existing_segments(out_path) if args.resume else []
+    processed_pairs, csv_line, segment_index, bootstrap_written, bootstrap_pose = resume_state(written_segments)
     bootstrap_target: dict | None = None
-    bootstrap_pose: list[float] | None = None
-    bootstrap_written = False
-    segment_index = 0
-    csv_line = 2
-    written_segments: list[dict] = []
     last_error = 0.0
     last_seen_count = 0
     last_activity = time.monotonic()
@@ -228,7 +312,7 @@ def main() -> int:
             last_activity = time.monotonic()
 
         if keyframes and not bootstrap_written:
-            bootstrap_target = extrapolate_target(keyframes[:1], args.sample_ms, segment_index)
+            bootstrap_target = extrapolate_target(keyframes[:1], args.sample_ms, segment_index, model)
             segment, csv_line, poses = make_segment(
                 model,
                 segment_index,
@@ -254,6 +338,8 @@ def main() -> int:
             target = keyframes[processed_pairs + 1]
             if processed_pairs == 0 and bootstrap_pose is not None:
                 correction_error = pose_error(bootstrap_pose, target["pose"])
+                predicted = bootstrap_target or pose_to_keyframe("resumed_bootstrap", target["t_ms"], bootstrap_pose)
+                append_bootstrap_sample(Path(args.bootstrap_samples) if args.bootstrap_samples else None, start, predicted, target, correction_error)
                 if correction_error > args.correction_threshold:
                     correction_start = pose_to_keyframe(f"bootstrap_displayed_{processed_pairs:04d}", start["t_ms"], bootstrap_pose)
                     segment, csv_line, poses = make_segment(
@@ -299,6 +385,7 @@ def main() -> int:
         if args.idle_exit_ms is not None and keyframes and (time.monotonic() - last_activity) * 1000 >= args.idle_exit_ms:
             break
         time.sleep(max(args.poll_ms, 10) / 1000)
+    update_result(result_path, model, last_seen_count, written_segments, last_error, args.render_ms, args.frames, state="stopped")
     return 0
 
 

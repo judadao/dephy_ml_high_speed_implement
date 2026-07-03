@@ -310,6 +310,7 @@ Run only the watcher test:
 
 ```sh
 make -f Makefile.linux hand-realtime-check
+make -f Makefile.linux bootstrap-prior-check
 ```
 
 The raw commands are:
@@ -327,6 +328,47 @@ python3 scripts/dephy_hand_realtime_watcher.py \
   --frames 1000 \
   --truncate
 ```
+
+For a long-running local Linux process, use the service wrapper. It resumes
+existing JSONL output, writes a heartbeat-style `result.json`, logs to
+`build_out/runtime/realtime_watcher.log`, and restarts the watcher if it exits:
+
+```sh
+make -f Makefile.linux web-realtime-service
+```
+
+The watcher is safe for append-style files:
+
+- It ignores incomplete trailing CSV rows while a writer is in the middle of a
+  line.
+- `--resume` reads existing `prediction_segments.jsonl` and continues
+  `segment_index` and `csvLine` instead of duplicating old segments.
+- `--bootstrap-samples build_out/runtime/bootstrap_samples.jsonl` records
+  positive/negative bootstrap guesses for later prior tuning.
+
+Fine-tune the bootstrap prior from those samples:
+
+```sh
+python3 scripts/train_bootstrap_prior.py \
+  --samples build_out/runtime/bootstrap_samples.jsonl \
+  --model-in build_out/hand_sequence/model.json \
+  --model-out build_out/hand_sequence/model_with_prior.json
+```
+
+The watcher will use `bootstrap_prior.mean_delta` when the loaded model has
+that field. This improves the first "only A exists" guess without changing the
+confirmed A-to-B endpoint contract.
+
+Bridge from the sibling IO simulator when it is available:
+
+```sh
+SAMPLE_MS=300 LOOP=1 \
+  sh scripts/run_io_device_realtime_bridge.sh \
+  ../linux_io_device_simul/scripts/hand_keyframe_demo.script \
+  web/public/demo/hand_keyframes.csv
+```
+
+If the simulator path is different, set `SIMUL_BIN=/path/to/linux_io_device_simul`.
 
 `prediction_segments.jsonl` is append-only during a realtime run. Each JSONL
 line is a complete segment with metadata:
@@ -348,6 +390,12 @@ line is a complete segment with metadata:
 `correction_segments`, `prediction_frames`, and segment-local smoothness
 metrics. Consumers should treat `keyframes.csv` and `prediction_segments.jsonl`
 as the data source.
+
+Realtime data contracts are documented in:
+
+- `schemas/prediction_segment.schema.json`
+- `schemas/realtime_result.schema.json`
+- `schemas/bootstrap_prior_sample.schema.json`
 
 ## Web Hand Demo
 

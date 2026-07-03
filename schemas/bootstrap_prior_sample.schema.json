@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dephy.local/schemas/bootstrap_prior_sample.schema.json",
+  "title": "Dephy Bootstrap Prior Training Sample",
+  "type": "object",
+  "required": ["format", "label", "start", "predicted_target", "actual_target", "sample_ms", "metrics"],
+  "properties": {
+    "format": { "const": "dephy_bootstrap_prior_sample_v1" },
+    "label": { "enum": ["positive", "negative"] },
+    "start": { "$ref": "#/$defs/pose" },
+    "predicted_target": { "$ref": "#/$defs/pose" },
+    "actual_target": { "$ref": "#/$defs/pose" },
+    "sample_ms": { "type": "integer", "minimum": 1 },
+    "metrics": {
+      "type": "object",
+      "required": ["target_error"],
+      "properties": {
+        "target_error": { "type": "number", "minimum": 0 }
+      }
+    }
+  },
+  "$defs": {
+    "pose": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "items": { "type": "number" }
+    }
+  }
+}

@@ -38,3 +38,18 @@ All initial TODO items are implemented as first-pass, tested building blocks.
 - [x] Add 300ms IO replay and 16ms/33ms prediction timeline visualization.
 - [x] Add deterministic gait baseline, interpolation fallback, and residual learner.
 - [x] Add GIF/APNG or raw frame streaming helper after the PPM/indexed frame generator is stable.
+
+## Completed Realtime Append Work
+
+- [x] Add append-style realtime keyframe watcher.
+- [x] Generate bootstrap, confirmed, and correction prediction segments.
+- [x] Support watcher resume from existing `prediction_segments.jsonl`.
+- [x] Ignore incomplete trailing CSV rows during append writes.
+- [x] Emit `result.json` heartbeat/status counters for realtime runs.
+- [x] Record bootstrap positive/negative samples for later prior tuning.
+- [x] Add lightweight bootstrap prior training and model export.
+- [x] Add realtime JSON schemas for segments, result, and bootstrap samples.
+- [x] Add local Linux service wrapper with restart logging.
+- [x] Add sibling io-device simulator bridge script.
+- [x] Update web to play growing JSONL segments without resetting playback.
+- [x] Show realtime result counters in the web panel.

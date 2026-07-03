@@ -23,6 +23,7 @@ python3 scripts/dephy_hand_realtime_watcher.py \
     --frames 20 \
     --poll-ms 20 \
     --max-keyframes 4 \
+    --bootstrap-samples "$outdir/bootstrap_samples.jsonl" \
     --correction-threshold 0 \
     --truncate
 
@@ -36,3 +37,33 @@ grep -q '"bootstrap_segments": 1' "$outdir/result.json"
 grep -q '"confirmed_segments": 3' "$outdir/result.json"
 grep -q '"correction_segments": 1' "$outdir/result.json"
 grep -q '"success": true' "$outdir/result.json"
+grep -q '"format":"dephy_bootstrap_prior_sample_v1"' "$outdir/bootstrap_samples.jsonl"
+grep -q '"state": "stopped"' "$outdir/result.json"
+
+cp "$outdir/keyframes.csv" "$outdir/keyframes_partial.csv"
+printf 'partial,999,' >> "$outdir/keyframes_partial.csv"
+python3 scripts/dephy_hand_realtime_watcher.py \
+    --keyframes "$outdir/keyframes_partial.csv" \
+    --model "$model_dir/model.json" \
+    --out "$outdir/partial_segments.jsonl" \
+    --result "$outdir/partial_result.json" \
+    --render-ms 16 \
+    --sample-ms 10 \
+    --frames 5 \
+    --poll-ms 20 \
+    --max-keyframes 4 \
+    --truncate
+grep -q '"confirmed_segments": 3' "$outdir/partial_result.json"
+
+python3 scripts/dephy_hand_realtime_watcher.py \
+    --keyframes "$outdir/keyframes.csv" \
+    --model "$model_dir/model.json" \
+    --out "$outdir/prediction_segments.jsonl" \
+    --result "$outdir/resume_result.json" \
+    --render-ms 16 \
+    --sample-ms 10 \
+    --frames 20 \
+    --poll-ms 20 \
+    --max-keyframes 4 \
+    --resume
+grep -q '"segments_written": 5' "$outdir/resume_result.json"
