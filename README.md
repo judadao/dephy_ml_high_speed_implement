@@ -502,6 +502,11 @@ inside React:
 
 The web UI is intentionally split by playback mode:
 
+- `Realtime Demo` mode is the default live demo. It only shows runtime IO
+  anchors and the current prediction segment. Reference samples are hidden, and
+  queued/future segment rows are not expanded. When the next runtime anchor
+  arrives and implement appends a segment, playback continues into that new
+  segment.
 - `Anchors` mode shows a compact runtime anchor list only. Selecting an anchor
   pauses playback and hides prediction rows so recorded script review stays
   simple.

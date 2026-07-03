@@ -377,6 +377,7 @@ function App() {
   const segmentsTextRef = useRef("");
   const predictionSegmentsRef = useRef([]);
   const segmentPlaybackRef = useRef({ segmentIndex: 0, startTime: 0, lastFrameIndex: -1 });
+  const playableSegmentCountRef = useRef(0);
   const [dataStatus, setDataStatus] = useState("loading");
   const frameRef = useRef(null);
   const keyframeCsvRef = useRef("");
@@ -388,7 +389,7 @@ function App() {
   const keyframeIndexRef = useRef(0);
   const keyframeTickRef = useRef(0);
   const [running, setRunning] = useState(true);
-  const [playMode, setPlayMode] = useState("prediction");
+  const [playMode, setPlayMode] = useState("realtime");
   const [selectedKeyframeIndex, setSelectedKeyframeIndex] = useState(0);
   const [renderError, setRenderError] = useState("");
   const [expandedSegments, setExpandedSegments] = useState({});
@@ -434,7 +435,7 @@ function App() {
     if (isInitialLoad) {
       segmentPlaybackRef.current = { segmentIndex: 0, startTime: performance.now(), lastFrameIndex: -1 };
     }
-    if (isInitialLoad && playMode === "prediction" && frames.length > 0) {
+    if (isInitialLoad && playMode !== "keyframes" && frames.length > 0) {
       const first = frames[0];
       frameRef.current = makeFrameState(first, null, null);
       setFrame(frameRef.current);
@@ -729,7 +730,7 @@ function App() {
   }
 
   function startPlayback() {
-    if (playMode === "prediction") {
+    if (playMode !== "keyframes") {
       const segments = predictionSegmentsRef.current;
       if (segments.length > 0) {
         const playback = segmentPlaybackRef.current;
@@ -765,7 +766,7 @@ function App() {
     );
     const segment = segments[segmentIndex];
     setRunning(false);
-    setPlayMode("prediction");
+    setPlayMode(playMode === "realtime" ? "realtime" : "prediction");
     setSelectedKeyframeIndex(index);
     keyframeIndexRef.current = index;
     if (segment?.frames.length) {
@@ -783,7 +784,7 @@ function App() {
     if (!keyframes[index]) {
       return;
     }
-    if (playMode === "prediction") {
+    if (playMode !== "keyframes") {
       showPredictionForAnchor(index);
       return;
     }
@@ -795,14 +796,25 @@ function App() {
     setFrame(frameRef.current);
   }
 
-  const sequenceMode = playMode === "prediction";
+  const realtimeMode = playMode === "realtime";
+  const sequenceMode = playMode !== "keyframes";
   const predictionSegments = sequenceSegments;
 
   useEffect(() => {
     const playableSegments = predictionSegments.filter((segment) => segment.frames.length > 0);
+    const previousCount = playableSegmentCountRef.current;
     predictionSegmentsRef.current = playableSegments;
+    playableSegmentCountRef.current = playableSegments.length;
     if (playableSegments.length === 0) {
       return;
+    }
+    if (playableSegments.length > previousCount && previousCount > 0) {
+      const playback = segmentPlaybackRef.current;
+      const currentSegment = playableSegments[playback.segmentIndex];
+      if (currentSegment && playback.segmentIndex === previousCount - 1 && playback.lastFrameIndex >= currentSegment.frames.length - 1) {
+        segmentPlaybackRef.current = { segmentIndex: playback.segmentIndex + 1, startTime: performance.now(), lastFrameIndex: -1 };
+        return;
+      }
     }
     if (segmentPlaybackRef.current.segmentIndex >= playableSegments.length) {
       segmentPlaybackRef.current = { segmentIndex: 0, startTime: performance.now(), lastFrameIndex: -1 };
@@ -940,6 +952,9 @@ function App() {
 
           <div className="playback-panel">
             <div className="mode-toggle" role="group" aria-label="playback mode">
+              <button type="button" className={playMode === "realtime" ? "active" : ""} onClick={() => setPlayMode("realtime")}>
+                Realtime Demo
+              </button>
               <button type="button" className={playMode === "prediction" ? "active" : ""} onClick={() => setPlayMode("prediction")}>
                 Prediction
               </button>
@@ -1009,7 +1024,7 @@ function App() {
                 {keyframes.map((item, keyframeIndex) => {
                   const segmentsForKeyframe = predictionSegments.filter(
                     (segment) => segment.from.frame_id === item.frame_id || (segment.segmentType === "correction" && segment.to.frame_id === item.frame_id)
-                  );
+                  ).filter((segment) => !realtimeMode || segment.segmentIndex === activeSegment?.segmentIndex);
                   const isActive = keyframeIndex === activeKeyframeIndex;
                   return (
                     <div className={isActive ? "keyframe-script-group active" : "keyframe-script-group"} key={item.frame_id}>
@@ -1069,7 +1084,7 @@ function App() {
                 segment {predictionSegments.length ? activeSegmentIndex + 1 : 0}/{predictionSegments.length}: {activeSegment?.segmentType ?? "-"} {activeSegment?.from.frame_id ?? "-"} - {activeSegment?.to.frame_id ?? "-"}
               </div>
             </div>
-            <div className="script-panel">
+            {!realtimeMode ? <div className="script-panel">
               <div className="timeline-head">
                 <span>reference samples</span>
                 <strong>{sampleKeyframes.length}</strong>
@@ -1086,7 +1101,7 @@ function App() {
                 ))}
               </div>
               <div className="window-range">training/reference only; runtime prediction uses anchors</div>
-            </div>
+            </div> : null}
           </div>
 
           <div className="live-grid">
