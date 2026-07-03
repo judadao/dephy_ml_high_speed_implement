@@ -29,6 +29,12 @@ grep -Fq 'latestPlayableSegmentKeyRef' web/src/main.jsx
 grep -Fq 'latestKey !== previousLatestKey' web/src/main.jsx
 grep -Fq 'formatPredictionCsvRow(prediction)' web/src/main.jsx
 grep -Fq 'pausedFrameIndex / segment.frames.length' web/src/main.jsx
+grep -Fq 'if (playMode === PLAY_MODES.ANCHORS) {' web/src/main.jsx
+grep -Fq 'setRunning(false);' web/src/main.jsx
+if grep -Fq 'const nextIndex = running ? (keyframeIndexRef.current + 1) % keyframes.length : selectedKeyframeIndex;' web/src/main.jsx; then
+    echo "anchors tab still auto-replays keyframes" >&2
+    exit 1
+fi
 if grep -Fq 'segmentPlaybackRef.current = { ...playback, startTime: performance.now(), lastFrameIndex: -1 };' web/src/main.jsx; then
     echo "playback resume still resets to segment start" >&2
     exit 1

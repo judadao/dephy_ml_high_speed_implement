@@ -208,19 +208,6 @@ function App() {
     }
     const timer = window.setInterval(() => {
       if (playMode === PLAY_MODES.ANCHORS) {
-        const now = performance.now();
-        if (!running && frameRef.current?.targetIndex === selectedKeyframeIndex) {
-          return;
-        }
-        if (running && now - keyframeTickRef.current < ANCHOR_MS) {
-          return;
-        }
-        const nextIndex = running ? (keyframeIndexRef.current + 1) % keyframes.length : selectedKeyframeIndex;
-        keyframeTickRef.current = now;
-        keyframeIndexRef.current = nextIndex;
-        setSelectedKeyframeIndex(nextIndex);
-        frameRef.current = frameFromKeyframe(keyframes[nextIndex], nextIndex);
-        setFrame(frameRef.current);
         return;
       }
 
@@ -284,6 +271,12 @@ function App() {
     }, RENDER_MS);
     return () => window.clearInterval(timer);
   }, [keyframes, playMode, policy, running, selectedKeyframeIndex, sequenceFrames, sequenceResult]);
+
+  useEffect(() => {
+    if (playMode === PLAY_MODES.ANCHORS) {
+      setRunning(false);
+    }
+  }, [playMode]);
 
   function resetDemo() {
     if (keyframes.length === 0) {
@@ -569,7 +562,18 @@ function App() {
           <div className="playback-panel">
             <div className="mode-toggle" role="group" aria-label="playback mode">
               {TAB_CONTRACTS.map((tab) => (
-                <button type="button" className={playMode === tab.mode ? "active" : ""} onClick={() => setPlayMode(tab.mode)} title={tab.contract} key={tab.mode}>
+                <button
+                  type="button"
+                  className={playMode === tab.mode ? "active" : ""}
+                  onClick={() => {
+                    if (tab.mode === PLAY_MODES.ANCHORS) {
+                      setRunning(false);
+                    }
+                    setPlayMode(tab.mode);
+                  }}
+                  title={tab.contract}
+                  key={tab.mode}
+                >
                   {tab.label}
                 </button>
               ))}
