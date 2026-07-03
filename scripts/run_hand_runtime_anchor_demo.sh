@@ -13,7 +13,7 @@ mkdir -p "$(dirname "$sample_keyframes")" "$(dirname "$runtime_io")" "$(dirname 
 python3 scripts/generate_random_hand_keyframes.py \
     --out "$sample_keyframes" \
     --count "${KEYFRAME_COUNT:-64}" \
-    --sample-ms "${SAMPLE_MS:-300}" \
+    --sample-ms "${SAMPLE_MS:-500}" \
     --seed "${WEB_SEED:-101}" \
     --noise-scale "${SAMPLE_NOISE_SCALE:-0.35}" \
     --mode "${KEYFRAME_MODE:-grasp_can}"
@@ -34,8 +34,8 @@ python3 scripts/dephy_hand_realtime_watcher.py \
     --model "$model" \
     --out "$segments" \
     --result "$result" \
-    --sample-ms "${SAMPLE_MS:-300}" \
-    --frames "${FRAMES:-1000}" \
+    --sample-ms "${SAMPLE_MS:-500}" \
+    --frames "${FRAMES:-100}" \
     --max-keyframes "${KEYFRAME_COUNT:-64}" \
     --bootstrap-samples "${OUTDIR:-build_out}/runtime/bootstrap_samples.jsonl" \
     --truncate

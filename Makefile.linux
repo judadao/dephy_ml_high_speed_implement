@@ -4,6 +4,8 @@ CFLAGS  ?= -Wall -Wextra -std=c11 -g
 LDFLAGS ?= -lm
 OUTDIR  ?= build_out
 FRAMES  ?= 1000
+WEB_FRAMES ?= 100
+WEB_SAMPLE_MS ?= 500
 WEB_SEED ?= 101
 NOISE_SCALE ?= 1.0
 KEYFRAME_COUNT ?= 64
@@ -104,7 +106,7 @@ web-demo-data:
 	mkdir -p web/public/demo web/public/demo/hand_sequence
 	cp examples/hand/hand_policy.json web/public/demo/hand_policy.json
 	if [ ! -f $(OUTDIR)/hand_sequence/model.json ]; then OUTDIR=$(OUTDIR) sh scripts/test_hand_sequence_model.sh >/dev/null; fi
-	OUTDIR=$(OUTDIR) KEYFRAME_COUNT=$(KEYFRAME_COUNT) SAMPLE_MS=300 WEB_SEED=$(WEB_SEED) NOISE_SCALE=$(NOISE_SCALE) KEYFRAME_MODE=$(KEYFRAME_MODE) FRAMES=$(FRAMES) sh scripts/run_hand_runtime_anchor_demo.sh
+	OUTDIR=$(OUTDIR) KEYFRAME_COUNT=$(KEYFRAME_COUNT) SAMPLE_MS=$(WEB_SAMPLE_MS) WEB_SEED=$(WEB_SEED) NOISE_SCALE=$(NOISE_SCALE) KEYFRAME_MODE=$(KEYFRAME_MODE) FRAMES=$(WEB_FRAMES) sh scripts/run_hand_runtime_anchor_demo.sh
 	cp web/public/demo/sample_keyframes.csv web/public/demo/hand_keyframes.csv
 	node scripts/validate_hand_keyframe_clearance.mjs --keyframes web/public/demo/sample_keyframes.csv --min-clearance 0
 
@@ -112,7 +114,7 @@ web-realtime-demo-data:
 	mkdir -p web/public/demo web/public/demo/hand_sequence
 	cp examples/hand/hand_policy.json web/public/demo/hand_policy.json
 	if [ ! -f $(OUTDIR)/hand_sequence/model.json ]; then OUTDIR=$(OUTDIR) sh scripts/test_hand_sequence_model.sh >/dev/null; fi
-	OUTDIR=$(OUTDIR) KEYFRAME_COUNT=$(KEYFRAME_COUNT) SAMPLE_MS=300 WEB_SEED=$(WEB_SEED) NOISE_SCALE=$(NOISE_SCALE) KEYFRAME_MODE=$(KEYFRAME_MODE) FRAMES=$(FRAMES) sh scripts/run_hand_runtime_anchor_demo.sh
+	OUTDIR=$(OUTDIR) KEYFRAME_COUNT=$(KEYFRAME_COUNT) SAMPLE_MS=$(WEB_SAMPLE_MS) WEB_SEED=$(WEB_SEED) NOISE_SCALE=$(NOISE_SCALE) KEYFRAME_MODE=$(KEYFRAME_MODE) FRAMES=$(WEB_FRAMES) sh scripts/run_hand_runtime_anchor_demo.sh
 	cp web/public/demo/sample_keyframes.csv web/public/demo/hand_keyframes.csv
 
 web-realtime-service:
@@ -122,11 +124,11 @@ web-realtime-demo:
 	if [ ! -f $(OUTDIR)/hand_sequence/model.json ]; then OUTDIR=$(OUTDIR) sh scripts/test_hand_sequence_model.sh >/dev/null; fi
 	mkdir -p web/public/demo web/public/demo/hand_sequence
 	cp examples/hand/hand_policy.json web/public/demo/hand_policy.json
-	OUTDIR=$(OUTDIR) FRAMES=$(FRAMES) KEYFRAME_COUNT=$(KEYFRAME_COUNT) WEB_SEED=$(WEB_SEED) NOISE_SCALE=$(NOISE_SCALE) KEYFRAME_MODE=$(KEYFRAME_MODE) LOOP=0 sh scripts/run_hand_runtime_loop_demo.sh & loop_pid=$$!; trap 'kill $$loop_pid 2>/dev/null || true' INT TERM EXIT; npm --prefix web run dev -- --host 127.0.0.1 --port 8091
+	OUTDIR=$(OUTDIR) FRAMES=$(WEB_FRAMES) SAMPLE_MS=$(WEB_SAMPLE_MS) KEYFRAME_COUNT=$(KEYFRAME_COUNT) WEB_SEED=$(WEB_SEED) NOISE_SCALE=$(NOISE_SCALE) KEYFRAME_MODE=$(KEYFRAME_MODE) LOOP=0 sh scripts/run_hand_runtime_loop_demo.sh & loop_pid=$$!; trap 'kill $$loop_pid 2>/dev/null || true' INT TERM EXIT; npm --prefix web run dev -- --host 127.0.0.1 --port 8091
 
 web-runtime-loop:
 	if [ ! -f $(OUTDIR)/hand_sequence/model.json ]; then OUTDIR=$(OUTDIR) sh scripts/test_hand_sequence_model.sh >/dev/null; fi
-	OUTDIR=$(OUTDIR) FRAMES=$(FRAMES) KEYFRAME_COUNT=$(KEYFRAME_COUNT) WEB_SEED=$(WEB_SEED) NOISE_SCALE=$(NOISE_SCALE) KEYFRAME_MODE=$(KEYFRAME_MODE) LOOP=0 sh scripts/run_hand_runtime_loop_demo.sh
+	OUTDIR=$(OUTDIR) FRAMES=$(WEB_FRAMES) SAMPLE_MS=$(WEB_SAMPLE_MS) KEYFRAME_COUNT=$(KEYFRAME_COUNT) WEB_SEED=$(WEB_SEED) NOISE_SCALE=$(NOISE_SCALE) KEYFRAME_MODE=$(KEYFRAME_MODE) LOOP=0 sh scripts/run_hand_runtime_loop_demo.sh
 
 web-realtime-flow-check:
 	OUTDIR=$(OUTDIR) sh scripts/test_web_realtime_flow.sh

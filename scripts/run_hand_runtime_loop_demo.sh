@@ -8,7 +8,7 @@ segments="${SEGMENTS:-web/public/demo/hand_sequence/prediction_segments.jsonl}"
 result="${RESULT:-web/public/demo/hand_sequence/result.json}"
 model="${MODEL:-${OUTDIR:-build_out}/hand_sequence/model.json}"
 loop="${LOOP:-0}"
-sample_ms="${SAMPLE_MS:-300}"
+sample_ms="${SAMPLE_MS:-500}"
 
 mkdir -p "$(dirname "$sample_keyframes")" "$(dirname "$runtime_io")" "$(dirname "$runtime_anchors")" "$(dirname "$segments")"
 
@@ -32,7 +32,7 @@ python3 scripts/dephy_hand_realtime_watcher.py \
     --out "$segments" \
     --result "$result" \
     --sample-ms "$sample_ms" \
-    --frames "${FRAMES:-1000}" \
+    --frames "${FRAMES:-100}" \
     --bootstrap-samples "${OUTDIR:-build_out}/runtime/bootstrap_samples.jsonl" \
     --truncate &
 watcher_pid=$!

@@ -6,7 +6,7 @@ export const SEGMENTS_URL = "/demo/hand_sequence/prediction_segments.jsonl";
 export const RESULT_URL = "/demo/hand_sequence/result.json";
 
 export const RENDER_MS = 16;
-export const ANCHOR_MS = 300;
+export const ANCHOR_MS = 500;
 export const UI_UPDATE_MS = 80;
 export const VISIBLE_ROW_LIMIT = 15;
 export const DEMO_RECORD_LIMIT = 15;

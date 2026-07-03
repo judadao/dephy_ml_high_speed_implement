@@ -453,7 +453,7 @@ design is intentionally left for a separate discussion.
 
 The Vite web demo visualizes the single-palm scope. The left side renders hand
 joint points and bones. The right side shows runtime IO anchors that behave
-like a simulator sending one observed anchor every 300ms, while the implement side
+like a simulator sending one observed anchor every 500ms, while the implement side
 appends prediction segment batches between anchors.
 
 ```sh
@@ -482,7 +482,7 @@ web/public/demo/hand_sequence/result.json
 ```
 
 The browser does not run the prediction model. The implement side receives the
-300ms runtime anchors and appends prediction segments. The first anchor can
+500ms runtime anchors and appends prediction segments. The first anchor can
 produce a `bootstrap` segment before the next real anchor arrives. Later real
 anchors produce `confirmed` segments, and large bootstrap misses can add
 `correction` segments. The web page only loads those segment batches, plays
@@ -508,8 +508,8 @@ inside React:
   by implement.
 - `examples/hand/hand_policy.json`: source prediction policy parameters.
 - `web/public/demo/hand_sequence/prediction_segments.jsonl`: implement output.
-  Each line is one bootstrap, confirmed, or correction batch with 1000 predicted
-  frames by default.
+  Each line is one bootstrap, confirmed, or correction batch with 100 predicted
+  frames by default for the web demo.
 - `web/public/demo/hand_sequence/result.json`: implement completion and smoothness
   metrics for the generated segments.
 
@@ -575,12 +575,13 @@ model-generated segment batches as the CLI checks. Control the test data seed,
 noise level, and prediction density with:
 
 ```sh
-WEB_SEED=222 NOISE_SCALE=1.5 KEYFRAME_COUNT=64 FRAMES=1000 make -f Makefile.linux web
+WEB_SEED=222 NOISE_SCALE=1.5 KEYFRAME_COUNT=64 WEB_SAMPLE_MS=500 WEB_FRAMES=100 make -f Makefile.linux web
 ```
 
 For offline model checks, `make -f Makefile.linux hand-sequence-check` and
 `make -f Makefile.linux web-sequence-demo-loop` can still generate prediction
 artifacts. The web loop uses the same segment JSONL format as the browser demo.
+Those non-web checks can still use higher densities such as `FRAMES=1000`.
 
 Validate the SSE endpoint:
 

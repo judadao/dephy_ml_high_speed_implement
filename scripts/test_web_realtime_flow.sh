@@ -20,8 +20,11 @@ grep -Fq 'segment.toAnchor.anchor_id === item.anchor_id' web/src/PredictionTab.j
 grep -Fq 'segmentPlaybackRef.current = { segmentIndex: latestIndex' web/src/main.jsx
 grep -Fq 'VISIBLE_ROW_LIMIT = 15' web/src/demoConstants.js
 grep -Fq 'DEMO_RECORD_LIMIT = 15' web/src/demoConstants.js
+grep -Fq 'ANCHOR_MS = 500' web/src/demoConstants.js
 grep -Fq 'PREDICTION_WINDOW_BEFORE = 7' web/src/demoConstants.js
 grep -Fq 'PREDICTION_WINDOW_AFTER = 7' web/src/demoConstants.js
+grep -Fq 'WEB_FRAMES ?= 100' Makefile.linux
+grep -Fq 'WEB_SAMPLE_MS ?= 500' Makefile.linux
 grep -Fq 'const demoRecordLimit = 15;' web/vite.config.js
 grep -Fq 'tailDemoText(event, data)' web/vite.config.js
 grep -Fq 'parseRuntimeAnchorsJsonl(text, DEMO_RECORD_LIMIT)' web/src/main.jsx
@@ -89,17 +92,21 @@ fi
 make -n -f Makefile.linux web-realtime-demo KEYFRAME_COUNT=5 > "$outdir/make_web_realtime_demo.txt"
 grep -q 'run_hand_runtime_loop_demo.sh' "$outdir/make_web_realtime_demo.txt"
 grep -q 'LOOP=0' "$outdir/make_web_realtime_demo.txt"
+grep -q 'FRAMES=100' "$outdir/make_web_realtime_demo.txt"
+grep -q 'SAMPLE_MS=500' "$outdir/make_web_realtime_demo.txt"
 grep -q 'npm --prefix web run dev' "$outdir/make_web_realtime_demo.txt"
 
 make -n -f Makefile.linux web KEYFRAME_COUNT=5 > "$outdir/make_web.txt"
 grep -q 'run_hand_runtime_loop_demo.sh' "$outdir/make_web.txt"
 grep -q 'LOOP=0' "$outdir/make_web.txt"
+grep -q 'FRAMES=100' "$outdir/make_web.txt"
+grep -q 'SAMPLE_MS=500' "$outdir/make_web.txt"
 grep -q 'npm --prefix web run dev' "$outdir/make_web.txt"
 
 python3 scripts/generate_random_hand_keyframes.py \
     --out "$outdir/sample_keyframes.csv" \
     --count 5 \
-    --sample-ms 300 \
+    --sample-ms 500 \
     --seed 818 \
     --noise-scale 0.35 \
     --mode grasp_can
@@ -108,7 +115,7 @@ python3 scripts/stream_runtime_io_loop.py \
     --sample-keyframes "$outdir/sample_keyframes.csv" \
     --runtime-io "$outdir/runtime_io.csv" \
     --runtime-anchors "$outdir/runtime_anchors.jsonl" \
-    --sample-ms 300 \
+    --sample-ms 500 \
     --loop 3 \
     --seed 919 \
     --noise-scale 1.0 \
