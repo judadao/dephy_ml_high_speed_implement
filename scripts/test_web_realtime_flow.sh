@@ -32,12 +32,16 @@ grep -Fq 'formatPredictionCsvRow(prediction)' web/src/main.jsx
 grep -Fq 'from "./manualPlayback.js"' web/src/main.jsx
 grep -Fq 'from "./demoDisplay.js"' web/src/main.jsx
 grep -Fq 'from "./playbackTiming.js"' web/src/main.jsx
+grep -Fq 'from "./demoTransport.js"' web/src/main.jsx
 grep -Fq 'export function anchorFrameAt' web/src/manualPlayback.js
 grep -Fq 'export function advanceAnchorPlayback' web/src/manualPlayback.js
 grep -Fq 'export function predictionFrameForAnchor' web/src/manualPlayback.js
 grep -Fq 'export function currentRuntimeAnchorIndexForDisplay' web/src/demoDisplay.js
 grep -Fq 'export function predictionFrameWindow' web/src/demoDisplay.js
 grep -Fq 'export function resumePlaybackAtCurrentFrame' web/src/playbackTiming.js
+grep -Fq 'export function fetchInitialDemoData' web/src/demoTransport.js
+grep -Fq 'export function connectDemoEvents' web/src/demoTransport.js
+grep -Fq 'connectDemoEvents({' web/src/main.jsx
 grep -Fq 'switchPlaybackMode(tab.mode)' web/src/main.jsx
 grep -Fq 'anchorFrameAt(keyframes, selectedKeyframeIndex)' web/src/main.jsx
 grep -Fq 'advanceAnchorPlayback({' web/src/main.jsx

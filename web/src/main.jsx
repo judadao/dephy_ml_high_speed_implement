@@ -7,6 +7,7 @@ import { ANCHOR_MS, DEFAULT_POLICY, DEMO_RECORD_LIMIT, KEYFRAME_URL, PLAY_MODES,
 import { flattenPredictionSegments, formatPredictionCsvRow, frameFromKeyframe, makeFrameState, parseCsv, parsePredictionSegmentsJsonl, parseRuntimeAnchorsJsonl } from "./demoData.js";
 import { advanceAnchorPlayback, anchorFrameAt, predictionFrameForAnchor } from "./manualPlayback.js";
 import { resumePlaybackAtCurrentFrame, segmentDurationMs } from "./playbackTiming.js";
+import { connectDemoEvents, fetchInitialDemoData } from "./demoTransport.js";
 import "./styles.css";
 
 function App() {
@@ -131,76 +132,76 @@ function App() {
   useEffect(() => {
     let cancelled = false;
     const fetchOnce = () => {
-      Promise.all([
-        fetch(SAMPLE_KEYFRAME_URL, { cache: "no-store" }).then((response) => (response.ok ? response.text() : "")),
-        fetch(RUNTIME_ANCHORS_URL, { cache: "no-store" }).then((response) => (response.ok ? response.text() : "")),
-        fetch(SEGMENTS_URL, { cache: "no-store" }).then((response) => (response.ok ? response.text() : "")),
-        fetch(RESULT_URL, { cache: "no-store" }).then((response) => (response.ok ? response.text() : "")),
-      ])
-        .then(([sampleText, anchorText, segmentText, resultText]) => {
+      fetchInitialDemoData({
+        urls: {
+          sampleKeyframes: SAMPLE_KEYFRAME_URL,
+          runtimeAnchors: RUNTIME_ANCHORS_URL,
+          predictionSegments: SEGMENTS_URL,
+          result: RESULT_URL,
+        },
+        onSampleKeyframes: (text) => {
           if (cancelled) {
             return;
           }
-          if (sampleText) {
-            applySampleKeyframesText(sampleText);
+          applySampleKeyframesText(text);
+        },
+        onRuntimeAnchors: (text) => {
+          if (cancelled) {
+            return;
           }
-          if (anchorText) {
-            applyRuntimeAnchorsText(anchorText);
+          applyRuntimeAnchorsText(text);
+        },
+        onPredictionSegments: (text) => {
+          if (cancelled) {
+            return;
           }
-          if (segmentText) {
-            applySegmentsText(segmentText);
+          applySegmentsText(text);
+        },
+        onResult: (text) => {
+          if (cancelled) {
+            return;
           }
-          if (resultText) {
-            applyResultText(resultText);
-          }
-        })
-        .catch(() => {});
+          applyResultText(text);
+        },
+      }).catch(() => {});
     };
 
     fetchOnce();
-    if (!window.EventSource) {
-      setSequenceStatus("sse unavailable");
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    const events = new EventSource("/demo/events");
-    events.addEventListener("open", () => setSequenceStatus("sse connected"));
-    events.addEventListener("ready", () => setSequenceStatus("sse connected"));
-    events.addEventListener("sample_keyframes", (event) => {
-      if (!cancelled) {
-        applySampleKeyframesText(JSON.parse(event.data));
-      }
+    const events = connectDemoEvents({
+      onSampleKeyframes: (text) => {
+        if (!cancelled) {
+          applySampleKeyframesText(text);
+        }
+      },
+      onRuntimeAnchors: (text) => {
+        if (!cancelled) {
+          applyRuntimeAnchorsText(text);
+        }
+      },
+      onPolicy: (text) => {
+        if (!cancelled) {
+          applyPolicyText(text);
+        }
+      },
+      onPredictionSegments: (text) => {
+        if (!cancelled) {
+          applySegmentsText(text);
+        }
+      },
+      onResult: (text) => {
+        if (!cancelled) {
+          applyResultText(text);
+        }
+      },
+      onStatus: (status) => {
+        if (!cancelled) {
+          setSequenceStatus(status);
+        }
+      },
     });
-    events.addEventListener("runtime_anchors", (event) => {
-      if (!cancelled) {
-        applyRuntimeAnchorsText(JSON.parse(event.data));
-      }
-    });
-    events.addEventListener("policy", (event) => {
-      if (!cancelled) {
-        applyPolicyText(JSON.parse(event.data));
-      }
-    });
-    events.addEventListener("prediction_segments", (event) => {
-      if (!cancelled) {
-        applySegmentsText(JSON.parse(event.data));
-      }
-    });
-    events.addEventListener("result", (event) => {
-      if (!cancelled) {
-        applyResultText(JSON.parse(event.data));
-      }
-    });
-    events.onerror = () => {
-      if (!cancelled) {
-        setSequenceStatus("sse reconnecting");
-      }
-    };
     return () => {
       cancelled = true;
-      events.close();
+      events?.close();
     };
   }, [playMode]);
 
