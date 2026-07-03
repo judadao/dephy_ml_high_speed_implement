@@ -24,6 +24,20 @@ export function shouldRunPlayback({ playMode, running, playbackReady }) {
   return Boolean(running && playbackReady && !isManualReviewMode(playMode));
 }
 
+export function keyframesForMode({ playMode, liveKeyframes, anchorReviewKeyframes }) {
+  if (isManualReviewMode(playMode) && anchorReviewKeyframes.length > 0) {
+    return anchorReviewKeyframes;
+  }
+  return liveKeyframes;
+}
+
+export function clampKeyframeIndex(index, keyframes) {
+  if (keyframes.length === 0) {
+    return 0;
+  }
+  return Math.max(0, Math.min(index, keyframes.length - 1));
+}
+
 export function startPlaybackState({ playMode, playback, segment, segmentCount, now }) {
   if (isManualReviewMode(playMode)) {
     return { running: false, playback };

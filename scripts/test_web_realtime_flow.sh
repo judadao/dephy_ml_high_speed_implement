@@ -10,7 +10,7 @@ grep -Fq 'tabContracts.map' web/src/PlaybackToolbar.jsx
 grep -Fq 'current runtime IO keyframe + current prediction segment + current prediction row' web/src/demoConstants.js
 grep -Fq 'currentRuntimeAnchorIndexForDisplay({ realtimeMode' web/src/main.jsx
 grep -Fq 'if (!realtimeMode)' web/src/demoDisplay.js
-grep -Fq 'visibleRuntimeAnchors = realtimeMode && currentRuntimeAnchor ? [currentRuntimeAnchor] : keyframes' web/src/main.jsx
+grep -Fq 'visibleRuntimeAnchors = realtimeMode && currentRuntimeAnchor ? [currentRuntimeAnchor] : playMode === PLAY_MODES.ANCHORS ? reviewKeyframes : keyframes' web/src/main.jsx
 grep -Fq 'current runtime io' web/src/DeviceIoPanel.jsx
 grep -Fq 'current keyframe from io' web/src/DeviceIoPanel.jsx
 grep -Fq 'prediction for current keyframe' web/src/RealtimeDemoTab.jsx
@@ -51,6 +51,9 @@ grep -Fq 'export function MetricsPanels' web/src/MetricsPanels.jsx
 grep -Fq 'export function DemoHeader' web/src/DemoHeader.jsx
 grep -Fq 'playButtonState({ playMode, running })' web/src/DemoHeader.jsx
 grep -Fq 'shouldRunPlayback({ playMode, running, playbackReady })' web/src/main.jsx
+grep -Fq 'keyframesForMode({ playMode, liveKeyframes: keyframes, anchorReviewKeyframes })' web/src/main.jsx
+grep -Fq 'setAnchorReviewKeyframes(snapshot)' web/src/main.jsx
+grep -Fq 'playMode === PLAY_MODES.ANCHORS ? reviewKeyframes : keyframes' web/src/main.jsx
 grep -Fq 'nextSegmentPlayback({ segments, playback: segmentPlaybackRef.current, now })' web/src/main.jsx
 grep -Fq 'startPlaybackState({ playMode' web/src/main.jsx
 node scripts/test_web_playback_controller.mjs
@@ -74,7 +77,8 @@ grep -Fq 'export function connectDemoEvents' web/src/demoTransport.js
 grep -Fq 'connectDemoEvents({' web/src/main.jsx
 grep -Fq 'if (!events) {' web/src/main.jsx
 grep -Fq 'switchPlaybackMode(tab.mode)' web/src/PlaybackToolbar.jsx
-grep -Fq 'anchorFrameAt(keyframes, selectedKeyframeIndex)' web/src/main.jsx
+grep -Fq 'anchorFrameAt(sourceKeyframes, index)' web/src/main.jsx
+grep -Fq 'anchorFrameAt(snapshot, reviewIndex)' web/src/main.jsx
 grep -Fq 'anchorPlaybackRef' web/src/main.jsx
 grep -Fq 'keyframesRef.current' web/src/main.jsx
 grep -Fq 'sequenceResultRef.current' web/src/main.jsx

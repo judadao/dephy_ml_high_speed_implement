@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import {
+  clampKeyframeIndex,
   isManualReviewMode,
+  keyframesForMode,
   nextSegmentPlayback,
   playButtonState,
   shouldRunPlayback,
@@ -33,6 +35,14 @@ assert.equal(playButtonState({ playMode: PLAY_MODES.PREDICTION, running: true })
 assert.equal(shouldRunPlayback({ playMode: PLAY_MODES.ANCHORS, running: true, playbackReady: true }), false);
 assert.equal(shouldRunPlayback({ playMode: PLAY_MODES.REALTIME, running: true, playbackReady: true }), true);
 assert.equal(shouldRunPlayback({ playMode: PLAY_MODES.PREDICTION, running: true, playbackReady: true }), true);
+
+const liveKeyframes = [{ frame_id: "live_1" }, { frame_id: "live_2" }];
+const reviewKeyframes = [{ frame_id: "review_1" }];
+assert.equal(keyframesForMode({ playMode: PLAY_MODES.ANCHORS, liveKeyframes, anchorReviewKeyframes: reviewKeyframes })[0].frame_id, "review_1");
+assert.equal(keyframesForMode({ playMode: PLAY_MODES.REALTIME, liveKeyframes, anchorReviewKeyframes: reviewKeyframes })[0].frame_id, "live_1");
+assert.equal(clampKeyframeIndex(99, reviewKeyframes), 0);
+assert.equal(clampKeyframeIndex(-2, liveKeyframes), 0);
+assert.equal(clampKeyframeIndex(1, liveKeyframes), 1);
 
 const anchorStart = startPlaybackState({
   playMode: PLAY_MODES.ANCHORS,
