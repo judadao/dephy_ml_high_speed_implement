@@ -134,8 +134,7 @@ web-realtime-flow-check:
 web-build: web-demo-data
 	npm --prefix web run build
 
-web: web-demo-data
-	npm --prefix web run dev -- --host 127.0.0.1 --port 8091
+web: web-realtime-demo
 
 web-render-check: web-demo-data
 	OUTDIR=$(OUTDIR) ./scripts/test_web_render.sh

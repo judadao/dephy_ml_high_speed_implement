@@ -15,6 +15,11 @@ grep -q 'run_hand_runtime_loop_demo.sh' "$outdir/make_web_realtime_demo.txt"
 grep -q 'LOOP=0' "$outdir/make_web_realtime_demo.txt"
 grep -q 'npm --prefix web run dev' "$outdir/make_web_realtime_demo.txt"
 
+make -n -f Makefile.linux web KEYFRAME_COUNT=5 > "$outdir/make_web.txt"
+grep -q 'run_hand_runtime_loop_demo.sh' "$outdir/make_web.txt"
+grep -q 'LOOP=0' "$outdir/make_web.txt"
+grep -q 'npm --prefix web run dev' "$outdir/make_web.txt"
+
 python3 scripts/generate_random_hand_keyframes.py \
     --out "$outdir/sample_keyframes.csv" \
     --count 5 \

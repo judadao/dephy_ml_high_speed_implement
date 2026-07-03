@@ -463,9 +463,10 @@ make -f Makefile.linux web-realtime-demo
 
 Then open `http://127.0.0.1:8091/`.
 
-`make web` remains available for finite generated demo data and render/build
-checks. For the actual realtime behavior, use `web-realtime-demo`; otherwise
-the generated data may stop at the configured `KEYFRAME_COUNT`.
+`make web` is an alias for `web-realtime-demo`, so the default browser demo
+starts the live IO loop instead of stopping at the configured `KEYFRAME_COUNT`.
+Finite generated data is still used by render/build checks through
+`web-demo-data`.
 
 The web demo is a realtime playback surface. In Vite dev mode it subscribes to
 `/demo/events` with Server-Sent Events. The dev server watches these files and
