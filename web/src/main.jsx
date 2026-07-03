@@ -799,6 +799,9 @@ function App() {
   const realtimeMode = playMode === "realtime";
   const sequenceMode = playMode !== "keyframes";
   const predictionSegments = sequenceSegments;
+  const currentRuntimeAnchorIndex = realtimeMode ? Math.max(0, keyframes.length - 1) : selectedKeyframeIndex;
+  const currentRuntimeAnchor = keyframes[currentRuntimeAnchorIndex] || keyframes[0];
+  const visibleRuntimeAnchors = realtimeMode && currentRuntimeAnchor ? [currentRuntimeAnchor] : keyframes;
 
   useEffect(() => {
     const playableSegments = predictionSegments.filter((segment) => segment.frames.length > 0);
@@ -827,15 +830,23 @@ function App() {
         keyframes.findIndex((item, index) => index === frame.targetIndex || item.frame_id === frame.target_frame || item.t_ms === Math.round(frame.frame_t_ms))
       )
     : 0;
-  const activeSegmentIndex = Math.max(
-    0,
-    predictionSegments.findIndex((segment) => segment.frames.some((item) => item.csvLine === frame?.csvLine) || segment.to.frame_id === frame?.target_frame)
-  );
+  const realtimeCurrentSegmentIndex = currentRuntimeAnchor
+    ? predictionSegments.findLastIndex(
+        (segment) =>
+          segment.toAnchor.anchor_id === currentRuntimeAnchor.anchor_id ||
+          segment.to.frame_id === currentRuntimeAnchor.frame_id ||
+          segment.fromAnchor.anchor_id === currentRuntimeAnchor.anchor_id
+      )
+    : -1;
+  const playbackSegmentIndex = predictionSegments.findIndex((segment) => segment.frames.some((item) => item.csvLine === frame?.csvLine) || segment.to.frame_id === frame?.target_frame);
+  const activeSegmentIndex = Math.max(0, realtimeMode && realtimeCurrentSegmentIndex >= 0 ? realtimeCurrentSegmentIndex : playbackSegmentIndex);
   const activeSegment = predictionSegments[activeSegmentIndex];
   const activeSegmentFrameIndex = activeSegment ? Math.max(0, activeSegment.frames.findIndex((prediction) => prediction.csvLine === frame?.csvLine)) : 0;
   const activeSegmentProgress = activeSegment && activeSegment.frames.length > 0 ? Math.min(100, Math.round(((activeSegmentFrameIndex + 1) / activeSegment.frames.length) * 100)) : 0;
   const keyframeIndexById = useMemo(() => new Map(keyframes.map((item, index) => [item.frame_id, index])), [keyframes]);
-  const activeKeyframeIndex = sequenceMode
+  const activeKeyframeIndex = realtimeMode
+    ? currentRuntimeAnchorIndex
+    : sequenceMode
     ? Math.max(0, keyframeIndexById.get(activeSegment?.from.frame_id) ?? keyframeIndexById.get(activeSegment?.to.frame_id) ?? frameKeyframeIndex)
     : frameKeyframeIndex;
 
@@ -962,7 +973,7 @@ function App() {
                 Anchors
               </button>
             </div>
-            <div className="keyframe-picker">
+            {!realtimeMode ? <div className="keyframe-picker">
               <button type="button" onClick={() => showKeyframe((selectedKeyframeIndex - 1 + keyframes.length) % keyframes.length)} title="Previous keyframe">
                 <ChevronLeft size={16} />
               </button>
@@ -976,7 +987,7 @@ function App() {
               <button type="button" onClick={() => showKeyframe((selectedKeyframeIndex + 1) % keyframes.length)} title="Next keyframe">
                 <ChevronRight size={16} />
               </button>
-            </div>
+            </div> : null}
           </div>
 
           <div className="current-prediction">
@@ -1015,13 +1026,14 @@ function App() {
           <div className="script-panels">
             <div className="script-panel">
               <div className="timeline-head">
-                <span>runtime io anchors</span>
+                <span>{realtimeMode ? "current runtime io" : "runtime io anchors"}</span>
                 <strong>
-                  {activeKeyframeIndex + 1}/{keyframes.length}
+                  {realtimeMode ? `${currentRuntimeAnchorIndex + 1}/${keyframes.length}` : `${activeKeyframeIndex + 1}/${keyframes.length}`}
                 </strong>
               </div>
               <div className="script-window keyframe-window" ref={keyframeScrollRef}>
-                {keyframes.map((item, keyframeIndex) => {
+                {visibleRuntimeAnchors.map((item) => {
+                  const keyframeIndex = keyframes.findIndex((anchor) => anchor.anchor_id === item.anchor_id || anchor.frame_id === item.frame_id);
                   const segmentsForKeyframe = predictionSegments.filter(
                     (segment) => segment.from.frame_id === item.frame_id || (segment.segmentType === "correction" && segment.to.frame_id === item.frame_id)
                   ).filter((segment) => !realtimeMode || segment.segmentIndex === activeSegment?.segmentIndex);

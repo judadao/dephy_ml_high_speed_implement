@@ -12,7 +12,7 @@ KEYFRAME_MODE ?= grasp_can
 LIB := $(OUTDIR)/libdephy_ml_high_speed_implement.a
 OBJS := $(OUTDIR)/src/bitmap_anim.o $(OUTDIR)/src/joint_predictor.o $(OUTDIR)/src/hand_predictor.o
 
-.PHONY: all structure-audit direct-test test hand-rl-check hand-sequence-check hand-realtime-check runtime-anchor-check runtime-io-loop-check bootstrap-prior-check io-device-pipeline-check io-device-realtime-hand-check zephyr-metadata demo web-demo-data web-realtime-demo-data web-realtime-service web-runtime-loop web-sequence-demo-loop web-install web-build web web-render-check web-sse-check clean
+.PHONY: all structure-audit direct-test test hand-rl-check hand-sequence-check hand-realtime-check runtime-anchor-check runtime-io-loop-check bootstrap-prior-check io-device-pipeline-check io-device-realtime-hand-check zephyr-metadata demo web-demo-data web-realtime-demo-data web-realtime-service web-realtime-demo web-runtime-loop web-realtime-flow-check web-sequence-demo-loop web-install web-build web web-render-check web-sse-check clean
 
 all: $(LIB) $(OUTDIR)/dephy_bitmap_anim $(OUTDIR)/dephy_joint_replay $(OUTDIR)/dephy_hand_predict
 
@@ -118,9 +118,18 @@ web-realtime-demo-data:
 web-realtime-service:
 	OUTDIR=$(OUTDIR) FRAMES=$(FRAMES) sh scripts/run_hand_realtime_service.sh
 
+web-realtime-demo:
+	if [ ! -f $(OUTDIR)/hand_sequence/model.json ]; then OUTDIR=$(OUTDIR) sh scripts/test_hand_sequence_model.sh >/dev/null; fi
+	mkdir -p web/public/demo web/public/demo/hand_sequence
+	cp examples/hand/hand_policy.json web/public/demo/hand_policy.json
+	OUTDIR=$(OUTDIR) FRAMES=$(FRAMES) KEYFRAME_COUNT=$(KEYFRAME_COUNT) WEB_SEED=$(WEB_SEED) NOISE_SCALE=$(NOISE_SCALE) KEYFRAME_MODE=$(KEYFRAME_MODE) LOOP=0 sh scripts/run_hand_runtime_loop_demo.sh & loop_pid=$$!; trap 'kill $$loop_pid 2>/dev/null || true' INT TERM EXIT; npm --prefix web run dev -- --host 127.0.0.1 --port 8091
+
 web-runtime-loop:
 	if [ ! -f $(OUTDIR)/hand_sequence/model.json ]; then OUTDIR=$(OUTDIR) sh scripts/test_hand_sequence_model.sh >/dev/null; fi
-	OUTDIR=$(OUTDIR) FRAMES=$(FRAMES) LOOP=0 sh scripts/run_hand_runtime_loop_demo.sh
+	OUTDIR=$(OUTDIR) FRAMES=$(FRAMES) KEYFRAME_COUNT=$(KEYFRAME_COUNT) WEB_SEED=$(WEB_SEED) NOISE_SCALE=$(NOISE_SCALE) KEYFRAME_MODE=$(KEYFRAME_MODE) LOOP=0 sh scripts/run_hand_runtime_loop_demo.sh
+
+web-realtime-flow-check:
+	OUTDIR=$(OUTDIR) sh scripts/test_web_realtime_flow.sh
 
 web-build: web-demo-data
 	npm --prefix web run build

@@ -110,6 +110,9 @@ items:
   - id: web_prediction_active_segment
     title: Simplify web prediction display around the active segment
     status: done
+  - id: web_realtime_flow_regression
+    title: Add realtime web flow regression check for loop startup and current IO display
+    status: done
   - id: learned_bootstrap_model
     title: Replace lightweight bootstrap prior with fuller learned model
     status: pending_discussion

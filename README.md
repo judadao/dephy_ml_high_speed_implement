@@ -317,9 +317,14 @@ every 300ms, while the watcher appends prediction segments for the web SSE
 stream. `LOOP=0` means infinite loop; use a positive value for a finite run:
 
 ```sh
+make -f Makefile.linux web-realtime-demo
 make -f Makefile.linux web-runtime-loop LOOP=0
 LOOP=2 KEYFRAME_COUNT=16 make -f Makefile.linux web-runtime-loop
 ```
+
+Use `web-realtime-demo` for the normal browser demo because it starts both the
+looping runtime IO writer and the Vite web server. `web-runtime-loop` only runs
+the backend append loop and is useful when the web server is already running.
 
 Run only the watcher test:
 
@@ -327,6 +332,7 @@ Run only the watcher test:
 make -f Makefile.linux hand-realtime-check
 make -f Makefile.linux runtime-io-loop-check
 make -f Makefile.linux bootstrap-prior-check
+make -f Makefile.linux web-realtime-flow-check
 ```
 
 The raw commands are:
@@ -452,10 +458,14 @@ appends prediction segment batches between anchors.
 
 ```sh
 make -f Makefile.linux web-install
-make -f Makefile.linux web
+make -f Makefile.linux web-realtime-demo
 ```
 
 Then open `http://127.0.0.1:8091/`.
+
+`make web` remains available for finite generated demo data and render/build
+checks. For the actual realtime behavior, use `web-realtime-demo`; otherwise
+the generated data may stop at the configured `KEYFRAME_COUNT`.
 
 The web demo is a realtime playback surface. In Vite dev mode it subscribes to
 `/demo/events` with Server-Sent Events. The dev server watches these files and
@@ -503,10 +513,12 @@ inside React:
 The web UI is intentionally split by playback mode:
 
 - `Realtime Demo` mode is the default live demo. It only shows runtime IO
-  anchors and the current prediction segment. Reference samples are hidden, and
-  queued/future segment rows are not expanded. When the next runtime anchor
-  arrives and implement appends a segment, playback continues into that new
-  segment.
+  anchor that has most recently arrived from the simulated/device IO stream,
+  plus the current prediction segment associated with that anchor. Reference
+  samples are hidden, future anchors are not listed, and queued/future segment
+  rows are not expanded. When the next runtime anchor arrives and implement
+  appends a segment, the displayed current runtime IO row advances to that
+  newly received anchor.
 - `Anchors` mode shows a compact runtime anchor list only. Selecting an anchor
   pauses playback and hides prediction rows so recorded script review stays
   simple.

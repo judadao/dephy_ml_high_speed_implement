@@ -61,6 +61,7 @@ All initial TODO items are implemented as first-pass, tested building blocks.
 - [x] Split web demo into runtime anchors, current prediction, and reference samples.
 - [x] Add live runtime IO loop output for web demos.
 - [x] Simplify web prediction display around the active segment.
+- [x] Add realtime web flow regression check for loop startup and current IO display.
 
 ## Pending Model Discussion
 
