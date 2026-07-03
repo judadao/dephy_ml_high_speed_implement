@@ -2,7 +2,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "re
 import { createRoot } from "react-dom/client";
 import { ChevronDown, ChevronLeft, ChevronRight, Pause, Play, RotateCcw } from "lucide-react";
 import { HandScene } from "./HandScene.jsx";
-import { ANCHOR_MS, DEFAULT_POLICY, KEYFRAME_URL, PLAY_MODES, POLICY_URL, PREDICTION_WINDOW_AFTER, PREDICTION_WINDOW_BEFORE, RENDER_MS, RESULT_URL, RUNTIME_ANCHORS_URL, SAMPLE_KEYFRAME_URL, SEGMENTS_URL, TAB_CONTRACTS, UI_UPDATE_MS } from "./demoConstants.js";
+import { ANCHOR_MS, DEFAULT_POLICY, DEMO_RECORD_LIMIT, KEYFRAME_URL, PLAY_MODES, POLICY_URL, PREDICTION_WINDOW_AFTER, PREDICTION_WINDOW_BEFORE, RENDER_MS, RESULT_URL, RUNTIME_ANCHORS_URL, SAMPLE_KEYFRAME_URL, SEGMENTS_URL, TAB_CONTRACTS, UI_UPDATE_MS, VISIBLE_ROW_LIMIT } from "./demoConstants.js";
 import { flattenPredictionSegments, formatPredictionCsvRow, frameFromKeyframe, makeFrameState, parseCsv, parsePredictionSegmentsJsonl, parseRuntimeAnchorsJsonl } from "./demoData.js";
 import "./styles.css";
 
@@ -39,7 +39,7 @@ function App() {
     if (csv === keyframeCsvRef.current) {
       return;
     }
-    const loadedKeyframes = parseCsv(csv);
+    const loadedKeyframes = parseCsv(csv, DEMO_RECORD_LIMIT);
     keyframeCsvRef.current = csv;
     setSampleKeyframes(loadedKeyframes);
   }
@@ -48,7 +48,7 @@ function App() {
     if (text === runtimeAnchorsTextRef.current) {
       return;
     }
-    const loadedAnchors = parseRuntimeAnchorsJsonl(text);
+    const loadedAnchors = parseRuntimeAnchorsJsonl(text, DEMO_RECORD_LIMIT);
     runtimeAnchorsTextRef.current = text;
     setRuntimeAnchors(loadedAnchors);
     setSelectedKeyframeIndex((current) => Math.max(0, Math.min(current, loadedAnchors.length - 1)));
@@ -66,7 +66,7 @@ function App() {
     }
     const previousText = segmentsTextRef.current;
     segmentsTextRef.current = text;
-    const segments = parsePredictionSegmentsJsonl(text);
+    const segments = parsePredictionSegmentsJsonl(text, DEMO_RECORD_LIMIT);
     const frames = flattenPredictionSegments(segments);
     const isInitialLoad = previousText.length === 0;
     setSequenceSegments(segments);
@@ -300,13 +300,17 @@ function App() {
     if (playMode !== PLAY_MODES.ANCHORS) {
       const segments = predictionSegmentsRef.current;
       if (segments.length > 0) {
+        const now = performance.now();
         const playback = segmentPlaybackRef.current;
         const segment = segments[playback.segmentIndex] || segments[0];
         const isAtEnd = segment && playback.lastFrameIndex >= segment.frames.length - 1 && playback.segmentIndex >= segments.length - 1;
         if (isAtEnd) {
-          segmentPlaybackRef.current = { segmentIndex: 0, startTime: performance.now(), lastFrameIndex: -1 };
+          segmentPlaybackRef.current = { segmentIndex: 0, startTime: now, lastFrameIndex: -1 };
         } else {
-          segmentPlaybackRef.current = { ...playback, startTime: performance.now(), lastFrameIndex: -1 };
+          const segmentDuration = Math.max(1, segment.to.t_ms - segment.from.t_ms || ANCHOR_MS);
+          const pausedFrameIndex = Math.max(0, playback.lastFrameIndex);
+          const pausedRatio = segment.frames.length > 0 ? pausedFrameIndex / segment.frames.length : 0;
+          segmentPlaybackRef.current = { ...playback, startTime: now - pausedRatio * segmentDuration };
         }
       }
     }
@@ -709,7 +713,7 @@ function App() {
                             const isActiveSegment = segment.segmentIndex === activeSegment?.segmentIndex;
                             const segmentActiveIndex = Math.max(0, segment.frames.findIndex((prediction) => prediction.csvLine === frame.csvLine));
                             const windowStart = isActiveSegment ? Math.max(0, segmentActiveIndex - PREDICTION_WINDOW_BEFORE) : 0;
-                            const windowEnd = isActiveSegment ? Math.min(segment.frames.length, segmentActiveIndex + PREDICTION_WINDOW_AFTER + 1) : Math.min(segment.frames.length, 24);
+                            const windowEnd = isActiveSegment ? Math.min(segment.frames.length, segmentActiveIndex + PREDICTION_WINDOW_AFTER + 1) : Math.min(segment.frames.length, VISIBLE_ROW_LIMIT);
                             const visibleFrames = segment.frames.slice(windowStart, windowEnd);
                             return (
                               <div className="keyframe-prediction-block" key={segment.key}>
@@ -760,7 +764,7 @@ function App() {
                 <strong>{sampleKeyframes.length}</strong>
               </div>
               <div className="script-window keyframe-window">
-                {sampleKeyframes.slice(0, 48).map((item, index) => (
+                {sampleKeyframes.slice(0, VISIBLE_ROW_LIMIT).map((item, index) => (
                   <div className="keyframe-script-group" key={`${item.frame_id}-${index}`}>
                     <div className="keyframe sample-keyframe">
                       <span>{item.t_ms}</span>

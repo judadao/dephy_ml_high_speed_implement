@@ -8,8 +8,10 @@ export const RESULT_URL = "/demo/hand_sequence/result.json";
 export const RENDER_MS = 16;
 export const ANCHOR_MS = 300;
 export const UI_UPDATE_MS = 80;
-export const PREDICTION_WINDOW_BEFORE = 36;
-export const PREDICTION_WINDOW_AFTER = 36;
+export const VISIBLE_ROW_LIMIT = 15;
+export const DEMO_RECORD_LIMIT = 15;
+export const PREDICTION_WINDOW_BEFORE = 7;
+export const PREDICTION_WINDOW_AFTER = 7;
 
 export const DEFAULT_POLICY = {
   format: "dephy_hand_policy_v1",

@@ -519,6 +519,8 @@ The web UI is intentionally split by playback mode:
   processed by prediction/playback, not necessarily the newest IO already
   appended by the writer. If IO arrives faster than prediction catches up, the
   panel shows `io lag`.
+  Realtime IO in this mode is test/demo data, so the web/SSE display keeps only
+  the latest 15 runtime anchors, prediction segments, and visible rows.
 - `Prediction` mode is for inspecting generated prediction segments and segment
   rows. It can show segment type, from-anchor, to-anchor, target kind, row
   progress, and confidence.

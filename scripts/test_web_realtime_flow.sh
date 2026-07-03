@@ -17,6 +17,19 @@ grep -Fq 'current prediction rows' web/src/main.jsx
 grep -Fq 'predictionLag' web/src/main.jsx
 grep -Fq 'segment.toAnchor.anchor_id === item.anchor_id' web/src/main.jsx
 grep -Fq 'segmentPlaybackRef.current = { segmentIndex: latestIndex' web/src/main.jsx
+grep -Fq 'VISIBLE_ROW_LIMIT = 15' web/src/demoConstants.js
+grep -Fq 'DEMO_RECORD_LIMIT = 15' web/src/demoConstants.js
+grep -Fq 'PREDICTION_WINDOW_BEFORE = 7' web/src/demoConstants.js
+grep -Fq 'PREDICTION_WINDOW_AFTER = 7' web/src/demoConstants.js
+grep -Fq 'const demoRecordLimit = 15;' web/vite.config.js
+grep -Fq 'tailDemoText(event, data)' web/vite.config.js
+grep -Fq 'parseRuntimeAnchorsJsonl(text, DEMO_RECORD_LIMIT)' web/src/main.jsx
+grep -Fq 'parsePredictionSegmentsJsonl(text, DEMO_RECORD_LIMIT)' web/src/main.jsx
+grep -Fq 'pausedFrameIndex / segment.frames.length' web/src/main.jsx
+if grep -Fq 'segmentPlaybackRef.current = { ...playback, startTime: performance.now(), lastFrameIndex: -1 };' web/src/main.jsx; then
+    echo "playback resume still resets to segment start" >&2
+    exit 1
+fi
 
 make -n -f Makefile.linux web-realtime-demo KEYFRAME_COUNT=5 > "$outdir/make_web_realtime_demo.txt"
 grep -q 'run_hand_runtime_loop_demo.sh' "$outdir/make_web_realtime_demo.txt"

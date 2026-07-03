@@ -1,10 +1,11 @@
 import { RENDER_MS } from "./demoConstants.js";
 
-export function parseCsv(text) {
+export function parseCsv(text, maxRecords = 0) {
   if (!text.trim()) {
     return [];
   }
-  const [headerLine, ...rows] = text.trim().split(/\r?\n/);
+  const [headerLine, ...allRows] = text.trim().split(/\r?\n/);
+  const rows = maxRecords > 0 ? allRows.slice(-maxRecords) : allRows;
   const headers = headerLine.split(",");
   return rows.map((row) => {
     const values = row.split(",");
@@ -26,11 +27,12 @@ export function parseCsv(text) {
   });
 }
 
-export function parseRuntimeAnchorsJsonl(text) {
-  return text
+export function parseRuntimeAnchorsJsonl(text, maxRecords = 0) {
+  const lines = text
     .trim()
     .split(/\r?\n/)
-    .filter(Boolean)
+    .filter(Boolean);
+  return (maxRecords > 0 ? lines.slice(-maxRecords) : lines)
     .map((line) => {
       const anchor = JSON.parse(line);
       const pose = anchor.observed_pose || {};
@@ -105,11 +107,12 @@ function normalizePredictionFrame(frame, segmentType) {
   };
 }
 
-export function parsePredictionSegmentsJsonl(text) {
-  return text
+export function parsePredictionSegmentsJsonl(text, maxRecords = 0) {
+  const lines = text
     .trim()
     .split(/\r?\n/)
-    .filter(Boolean)
+    .filter(Boolean);
+  return (maxRecords > 0 ? lines.slice(-maxRecords) : lines)
     .map((line, index) => {
       const segment = JSON.parse(line);
       const segmentType = segment.segment_type || "confirmed";

@@ -11,6 +11,20 @@ const demoFiles = {
   prediction_segments: "demo/hand_sequence/prediction_segments.jsonl",
   result: "demo/hand_sequence/result.json",
 };
+const demoRecordLimit = 15;
+const csvTailEvents = new Set(["sample_keyframes", "runtime_io"]);
+const jsonlTailEvents = new Set(["runtime_anchors", "prediction_segments"]);
+
+function tailDemoText(event, data) {
+  const lines = data.trimEnd().split(/\r?\n/);
+  if (csvTailEvents.has(event) && lines.length > demoRecordLimit + 1) {
+    return [lines[0], ...lines.slice(-demoRecordLimit)].join("\n") + "\n";
+  }
+  if (jsonlTailEvents.has(event) && lines.length > demoRecordLimit) {
+    return lines.slice(-demoRecordLimit).join("\n") + "\n";
+  }
+  return data;
+}
 
 function sendEvent(res, event, filePath) {
   fs.readFile(filePath, "utf8", (error, data) => {
@@ -20,7 +34,7 @@ function sendEvent(res, event, filePath) {
       return;
     }
     res.write(`event: ${event}\n`);
-    res.write(`data: ${JSON.stringify(data)}\n\n`);
+    res.write(`data: ${JSON.stringify(tailDemoText(event, data))}\n\n`);
   });
 }
 
