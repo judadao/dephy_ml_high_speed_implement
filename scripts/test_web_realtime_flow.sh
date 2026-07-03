@@ -46,6 +46,9 @@ grep -Fq 'switchPlaybackMode(tab.mode)' web/src/main.jsx
 grep -Fq 'anchorFrameAt(keyframes, selectedKeyframeIndex)' web/src/main.jsx
 grep -Fq 'advanceAnchorPlayback({' web/src/main.jsx
 grep -Fq 'anchorPlaybackRef' web/src/main.jsx
+grep -Fq 'keyframesRef.current' web/src/main.jsx
+grep -Fq 'sequenceResultRef.current' web/src/main.jsx
+grep -Fq '}, [playMode, running, playbackReady]);' web/src/main.jsx
 grep -Fq 'pausedFrameIndex / segment.frames.length' web/src/playbackTiming.js
 grep -Fq 'if (playMode === PLAY_MODES.ANCHORS) {' web/src/main.jsx
 grep -Fq 'setRunning(false);' web/src/main.jsx

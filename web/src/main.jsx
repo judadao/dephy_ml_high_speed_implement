@@ -23,6 +23,8 @@ function App() {
   const segmentPlaybackRef = useRef({ segmentIndex: 0, startTime: 0, lastFrameIndex: -1 });
   const playableSegmentCountRef = useRef(0);
   const latestPlayableSegmentKeyRef = useRef("");
+  const keyframesRef = useRef([]);
+  const sequenceResultRef = useRef(null);
   const [dataStatus, setDataStatus] = useState("loading");
   const frameRef = useRef(null);
   const anchorPlaybackRef = useRef({ index: 0, lastTick: 0 });
@@ -36,8 +38,17 @@ function App() {
   const [playMode, setPlayMode] = useState(PLAY_MODES.REALTIME);
   const [selectedKeyframeIndex, setSelectedKeyframeIndex] = useState(0);
   const [expandedSegments, setExpandedSegments] = useState({});
+  const playbackReady = Boolean(frame);
 
   const keyframes = runtimeAnchors;
+
+  useEffect(() => {
+    keyframesRef.current = keyframes;
+  }, [keyframes]);
+
+  useEffect(() => {
+    sequenceResultRef.current = sequenceResult;
+  }, [sequenceResult]);
 
   function applySampleKeyframesText(csv) {
     if (csv === keyframeCsvRef.current) {
@@ -206,14 +217,18 @@ function App() {
   }, [playMode]);
 
   useEffect(() => {
-    if (!running || keyframes.length === 0 || !frameRef.current) {
+    if (!running || !playbackReady) {
       return undefined;
     }
     const timer = window.setInterval(() => {
+      const liveKeyframes = keyframesRef.current;
+      if (liveKeyframes.length === 0) {
+        return;
+      }
       if (playMode === PLAY_MODES.ANCHORS) {
         const now = performance.now();
         const advanced = advanceAnchorPlayback({
-          keyframes,
+          keyframes: liveKeyframes,
           currentIndex: anchorPlaybackRef.current.index,
           now,
           lastTick: anchorPlaybackRef.current.lastTick,
@@ -236,7 +251,7 @@ function App() {
         if (segment.frames.length === 0) {
           return;
         }
-        const segmentDuration = segmentDurationMs(segment);
+        let segmentDuration = segmentDurationMs(segment);
         let elapsed = now - playback.startTime;
         while (elapsed >= segmentDuration) {
           if (playback.segmentIndex >= segments.length - 1) {
@@ -244,7 +259,7 @@ function App() {
             if (playback.lastFrameIndex !== lastFrameIndex) {
               const nextFrame = segment.frames[lastFrameIndex];
               const previous = frameRef.current;
-              const next = makeFrameState(nextFrame, previous, sequenceResult);
+              const next = makeFrameState(nextFrame, previous, sequenceResultRef.current);
               next.anchorLoop = 1;
               frameRef.current = next;
               if (now - lastUiUpdateRef.current >= UI_UPDATE_MS) {
@@ -263,9 +278,9 @@ function App() {
           if (segment.frames.length === 0) {
             return;
           }
-          const nextDuration = segmentDurationMs(segment);
+          segmentDuration = segmentDurationMs(segment);
           elapsed = overflow;
-          if (elapsed < nextDuration) {
+          if (elapsed < segmentDuration) {
             break;
           }
         }
@@ -277,7 +292,7 @@ function App() {
         segmentPlaybackRef.current = { ...playback, lastFrameIndex: frameIndex };
         const nextFrame = segment.frames[frameIndex];
         const previous = frameRef.current;
-        const next = makeFrameState(nextFrame, previous, sequenceResult);
+        const next = makeFrameState(nextFrame, previous, sequenceResultRef.current);
         next.anchorLoop = 1;
         frameRef.current = next;
         if (now - lastUiUpdateRef.current >= UI_UPDATE_MS) {
@@ -287,7 +302,7 @@ function App() {
       }
     }, RENDER_MS);
     return () => window.clearInterval(timer);
-  }, [keyframes, playMode, policy, running, selectedKeyframeIndex, sequenceFrames, sequenceResult]);
+  }, [playMode, running, playbackReady]);
 
   useEffect(() => {
     if (playMode === PLAY_MODES.ANCHORS) {
