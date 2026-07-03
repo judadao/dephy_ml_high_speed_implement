@@ -15,7 +15,7 @@ implementation sequence should stay focused on core data/model/runtime
 contracts:
 
 - [x] Define the generic IO sample schema draft for `DI`, `DO`, `AI`, `AO`, and `Relay`.
-- [ ] Define cycle boundary and phase normalization rules.
+- [x] Define cycle boundary and phase normalization rules.
 - [ ] Define synthetic dataset generation rules.
 - [ ] Define model input vector, output channels, and 1000-frame tensor format.
 - [ ] Define training objectives and negative rejection labels.

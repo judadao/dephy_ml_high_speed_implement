@@ -7,7 +7,7 @@ items:
     status: done
   - id: cyclic_cycle_phase_rules
     title: Define cycle boundary and phase normalization rules
-    status: pending
+    status: done
   - id: cyclic_dataset_generation_rules
     title: Define synthetic positive, negative, and test dataset generation rules
     status: pending

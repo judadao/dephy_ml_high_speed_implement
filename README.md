@@ -18,6 +18,8 @@ Positive, negative, and test dataset design is recorded in
 [`docs/cyclic_io_dataset_design.md`](docs/cyclic_io_dataset_design.md).
 The initial IO schema draft is recorded in
 [`docs/cyclic_io_schema_draft.md`](docs/cyclic_io_schema_draft.md).
+Cycle boundary and phase rules are recorded in
+[`docs/cyclic_io_phase_rules.md`](docs/cyclic_io_phase_rules.md).
 
 The existing single-palm/hand workflow remains a demo and validation surface,
 not the final product scope. It is useful for visualizing low-rate anchors,

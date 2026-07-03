@@ -55,6 +55,16 @@ cycle_period_ms = 1000ms -> 1000 frames -> 1.0ms per frame
 This means 1000 frames represent one normalized cycle or key transition. They
 do not represent a fixed wall-clock duration.
 
+Cycle boundary and phase rules are defined in
+[`cyclic_io_phase_rules.md`](cyclic_io_phase_rules.md). The initial contract is:
+
+```txt
+training phase is supervised
+runtime phase is estimated
+prediction phase is normalized
+cycle boundary uses explicit metadata first and phase wrap second
+```
+
 ## Data Model Direction
 
 Raw IO samples should preserve point identity and timing:
