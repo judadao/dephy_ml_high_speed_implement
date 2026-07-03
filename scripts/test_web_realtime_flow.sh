@@ -45,7 +45,10 @@ grep -Fq 'latestPlayableSegmentKeyRef' web/src/main.jsx
 grep -Fq 'latestKey !== previousLatestKey' web/src/main.jsx
 grep -Fq 'formatPredictionCsvRow(prediction)' web/src/RealtimeDemoTab.jsx
 grep -Fq 'formatPredictionCsvRow(prediction)' web/src/PredictionTab.jsx
-grep -Fq 'sample_keyframes.csv reference; prediction rows are sample-derived in this tab' web/src/PredictionTab.jsx
+if rg -q 'ReferenceSamplesPanel|reference samples|sample_keyframes.csv reference' web/src/PredictionTab.jsx; then
+    echo "prediction tab should not render a duplicate sample/reference panel" >&2
+    exit 1
+fi
 grep -Fq 'export function RealtimeDemoTab' web/src/RealtimeDemoTab.jsx
 grep -Fq 'export function DeviceIoPanel' web/src/DeviceIoPanel.jsx
 grep -Fq 'export function PredictionTab' web/src/PredictionTab.jsx

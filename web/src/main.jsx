@@ -576,7 +576,6 @@ function App() {
               keyframeScrollRef={keyframeScrollRef}
               keyframes={reviewKeyframes}
               predictionSegments={predictionSegments}
-              sampleKeyframes={sampleKeyframes}
               sequenceCsvRows={sequenceCsvRows}
               showKeyframe={showKeyframe}
               toggleSegment={toggleSegment}

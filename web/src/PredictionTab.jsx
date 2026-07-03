@@ -14,7 +14,6 @@ export function PredictionTab({
   keyframeScrollRef,
   keyframes,
   predictionSegments,
-  sampleKeyframes,
   sequenceCsvRows,
   showKeyframe,
   toggleSegment,
@@ -130,31 +129,7 @@ export function PredictionTab({
             segment {predictionSegments.length ? activeSegmentIndex + 1 : 0}/{predictionSegments.length}: {activeSegment?.segmentType ?? "-"} {activeSegment?.from.frame_id ?? "-"} - {activeSegment?.to.frame_id ?? "-"}
           </div>
         </div>
-        <ReferenceSamplesPanel sampleKeyframes={sampleKeyframes} visibleRowLimit={visibleRowLimit} />
       </div>
     </>
-  );
-}
-
-function ReferenceSamplesPanel({ sampleKeyframes, visibleRowLimit }) {
-  return (
-    <div className="script-panel">
-      <div className="timeline-head">
-        <span>reference samples</span>
-        <strong>{sampleKeyframes.length}</strong>
-      </div>
-      <div className="script-window keyframe-window">
-        {sampleKeyframes.slice(0, visibleRowLimit).map((item, index) => (
-          <div className="keyframe-script-group" key={`${item.frame_id}-${index}`}>
-            <div className="keyframe sample-keyframe">
-              <span>{item.t_ms}</span>
-              <strong>{item.frame_id}</strong>
-              <em>{item.grip.toFixed(2)}</em>
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="window-range">sample_keyframes.csv reference; prediction rows are sample-derived in this tab</div>
-    </div>
   );
 }
