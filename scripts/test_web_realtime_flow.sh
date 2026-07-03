@@ -33,17 +33,20 @@ grep -Fq 'from "./manualPlayback.js"' web/src/main.jsx
 grep -Fq 'from "./demoDisplay.js"' web/src/main.jsx
 grep -Fq 'from "./playbackTiming.js"' web/src/main.jsx
 grep -Fq 'export function anchorFrameAt' web/src/manualPlayback.js
+grep -Fq 'export function advanceAnchorPlayback' web/src/manualPlayback.js
 grep -Fq 'export function predictionFrameForAnchor' web/src/manualPlayback.js
 grep -Fq 'export function currentRuntimeAnchorIndexForDisplay' web/src/demoDisplay.js
 grep -Fq 'export function predictionFrameWindow' web/src/demoDisplay.js
 grep -Fq 'export function resumePlaybackAtCurrentFrame' web/src/playbackTiming.js
 grep -Fq 'switchPlaybackMode(tab.mode)' web/src/main.jsx
 grep -Fq 'anchorFrameAt(keyframes, selectedKeyframeIndex)' web/src/main.jsx
+grep -Fq 'advanceAnchorPlayback({' web/src/main.jsx
+grep -Fq 'anchorPlaybackRef' web/src/main.jsx
 grep -Fq 'pausedFrameIndex / segment.frames.length' web/src/playbackTiming.js
 grep -Fq 'if (playMode === PLAY_MODES.ANCHORS) {' web/src/main.jsx
 grep -Fq 'setRunning(false);' web/src/main.jsx
-if grep -Fq 'const nextIndex = running ? (keyframeIndexRef.current + 1) % keyframes.length : selectedKeyframeIndex;' web/src/main.jsx; then
-    echo "anchors tab still auto-replays keyframes" >&2
+if grep -Fq 'setPlayMode(tab.mode); setRunning(true)' web/src/main.jsx; then
+    echo "anchors tab switch should not auto-start playback" >&2
     exit 1
 fi
 if grep -Fq 'segmentPlaybackRef.current = { ...playback, startTime: performance.now(), lastFrameIndex: -1 };' web/src/main.jsx; then

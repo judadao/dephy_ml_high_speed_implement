@@ -5,7 +5,7 @@ import { HandScene } from "./HandScene.jsx";
 import { activeFrameIndexForSegment, activeSegmentIndexForFrame, currentRuntimeAnchorIndexForDisplay, frameKeyframeIndexForDisplay, predictionFrameWindow } from "./demoDisplay.js";
 import { ANCHOR_MS, DEFAULT_POLICY, DEMO_RECORD_LIMIT, KEYFRAME_URL, PLAY_MODES, POLICY_URL, PREDICTION_WINDOW_AFTER, PREDICTION_WINDOW_BEFORE, RENDER_MS, RESULT_URL, RUNTIME_ANCHORS_URL, SAMPLE_KEYFRAME_URL, SEGMENTS_URL, TAB_CONTRACTS, UI_UPDATE_MS, VISIBLE_ROW_LIMIT } from "./demoConstants.js";
 import { flattenPredictionSegments, formatPredictionCsvRow, frameFromKeyframe, makeFrameState, parseCsv, parsePredictionSegmentsJsonl, parseRuntimeAnchorsJsonl } from "./demoData.js";
-import { anchorFrameAt, predictionFrameForAnchor } from "./manualPlayback.js";
+import { advanceAnchorPlayback, anchorFrameAt, predictionFrameForAnchor } from "./manualPlayback.js";
 import { resumePlaybackAtCurrentFrame, segmentDurationMs } from "./playbackTiming.js";
 import "./styles.css";
 
@@ -24,6 +24,7 @@ function App() {
   const latestPlayableSegmentKeyRef = useRef("");
   const [dataStatus, setDataStatus] = useState("loading");
   const frameRef = useRef(null);
+  const anchorPlaybackRef = useRef({ index: 0, lastTick: 0 });
   const keyframeCsvRef = useRef("");
   const runtimeAnchorsTextRef = useRef("");
   const keyframeScrollRef = useRef(null);
@@ -209,6 +210,20 @@ function App() {
     }
     const timer = window.setInterval(() => {
       if (playMode === PLAY_MODES.ANCHORS) {
+        const now = performance.now();
+        const advanced = advanceAnchorPlayback({
+          keyframes,
+          currentIndex: anchorPlaybackRef.current.index,
+          now,
+          lastTick: anchorPlaybackRef.current.lastTick,
+          sampleMs: ANCHOR_MS,
+        });
+        if (advanced?.frame) {
+          anchorPlaybackRef.current = { index: advanced.index, lastTick: advanced.lastTick };
+          setSelectedKeyframeIndex(advanced.index);
+          frameRef.current = advanced.frame;
+          setFrame(frameRef.current);
+        }
         return;
       }
 
@@ -285,6 +300,7 @@ function App() {
     }
     frameRef.current = frameFromKeyframe(keyframes[0], 0);
     setSelectedKeyframeIndex(0);
+    anchorPlaybackRef.current = { index: 0, lastTick: 0 };
     segmentPlaybackRef.current = { segmentIndex: 0, startTime: performance.now(), lastFrameIndex: -1 };
     setFrame(frameRef.current);
   }
@@ -330,6 +346,7 @@ function App() {
     setRunning(false);
     setPlayMode(PLAY_MODES.PREDICTION);
     setSelectedKeyframeIndex(index);
+    anchorPlaybackRef.current = { index, lastTick: 0 };
     if (segmentIndex >= 0 && segment?.frames.length) {
       segmentPlaybackRef.current = { segmentIndex, startTime: performance.now(), lastFrameIndex: 0 };
       setExpandedSegments((current) => ({ ...current, [segment.key]: true }));
@@ -363,6 +380,7 @@ function App() {
       setRunning(false);
       const manualFrame = anchorFrameAt(keyframes, selectedKeyframeIndex);
       if (manualFrame) {
+        anchorPlaybackRef.current = { index: selectedKeyframeIndex, lastTick: 0 };
         frameRef.current = manualFrame;
         setFrame(frameRef.current);
       }

@@ -18,6 +18,18 @@ export function anchorFrameAt(keyframes, index) {
   return keyframe ? frameFromKeyframe(keyframe, index) : null;
 }
 
+export function advanceAnchorPlayback({ keyframes, currentIndex, now, lastTick, sampleMs }) {
+  if (keyframes.length === 0 || now - lastTick < sampleMs) {
+    return null;
+  }
+  const index = (currentIndex + 1) % keyframes.length;
+  return {
+    index,
+    lastTick: now,
+    frame: anchorFrameAt(keyframes, index),
+  };
+}
+
 export function predictionFrameForAnchor({ keyframes, segments, index, previousFrame, sequenceResult }) {
   const keyframe = keyframes[index];
   if (!keyframe) {
