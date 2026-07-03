@@ -8,7 +8,7 @@ import "./styles.css";
 
 const KEYFRAME_URL = "/demo/hand_keyframes.csv";
 const POLICY_URL = "/demo/hand_policy.json";
-const SEQUENCE_URL = "/demo/hand_sequence/prediction.csv";
+const SEGMENTS_URL = "/demo/hand_sequence/prediction_segments.jsonl";
 const RESULT_URL = "/demo/hand_sequence/result.json";
 const RENDER_MS = 16;
 const ANCHOR_MS = 300;
@@ -23,11 +23,10 @@ const DEFAULT_POLICY = {
   speed_scale: 0.82,
 };
 
-function clamp(value, low, high) {
-  return Math.max(low, Math.min(high, value));
-}
-
 function parseCsv(text) {
+  if (!text.trim()) {
+    return [];
+  }
   const [headerLine, ...rows] = text.trim().split(/\r?\n/);
   const headers = headerLine.split(",");
   return rows.map((row) => {
@@ -48,39 +47,6 @@ function parseCsv(text) {
       safety_hold: Number(item.safety_hold),
     };
   });
-}
-
-function parsePredictionCsv(text) {
-  const trimmed = text.trim();
-  if (!trimmed) {
-    return [];
-  }
-  const [headerLine, ...rows] = trimmed.split(/\r?\n/);
-  const headers = headerLine.split(",");
-  return rows.map((row, index) => {
-    const values = row.split(",");
-    const item = Object.fromEntries(headers.map((key, column) => [key, values[column]]));
-    return {
-      frame_t_ms: Number(item.frame_t_ms),
-      target_frame: item.target_frame || `frame_${index}`,
-      x: Number(item.palm_x),
-      y: Number(item.palm_y),
-      z: Number(item.palm_z),
-      yaw: Number(item.yaw),
-      pitch: Number(item.pitch),
-      roll: Number(item.roll),
-      grip: Number(item.grip),
-      csvLine: index + 2,
-    };
-  });
-}
-
-function markSequenceKeyframes(frames, keyframes) {
-  const keyframeTimes = new Set(keyframes.map((keyframe) => keyframe.t_ms));
-  return frames.map((frame) => ({
-    ...frame,
-    keyframeLock: keyframeTimes.has(Math.round(frame.frame_t_ms)),
-  }));
 }
 
 function initialState(keyframe) {
@@ -114,103 +80,96 @@ function frameFromKeyframe(keyframe, index = 0) {
   };
 }
 
-function nextSequenceIndexByTime(frames, currentIndex, stepMs) {
-  if (frames.length <= 1) {
-    return 0;
+function segmentEndpoint(value, fallbackId, fallbackMs) {
+  if (value && typeof value === "object") {
+    return { frame_id: value.frame_id ?? fallbackId, t_ms: Number(value.t_ms ?? fallbackMs ?? 0) };
   }
-  const currentTime = frames[currentIndex]?.frame_t_ms ?? frames[0].frame_t_ms;
-  const endTime = frames[frames.length - 1].frame_t_ms;
-  const targetTime = currentTime + stepMs;
-  if (targetTime > endTime) {
-    return 0;
-  }
-  for (let index = currentIndex + 1; index < frames.length; index += 1) {
-    if (frames[index].frame_t_ms >= targetTime) {
-      return index;
-    }
-  }
-  return frames.length - 1;
+  return { frame_id: value ?? fallbackId, t_ms: Number(fallbackMs ?? 0) };
 }
 
-function buildPredictionSegments(frames, keyframes) {
-  if (frames.length === 0 || keyframes.length < 2) {
-    return [];
-  }
-  const byTarget = new Map();
-  frames.forEach((frame) => {
-    if (!byTarget.has(frame.target_frame)) {
-      byTarget.set(frame.target_frame, []);
-    }
-    byTarget.get(frame.target_frame).push(frame);
-  });
-  return keyframes.slice(1).map((to, index) => {
-    const segmentFrames = byTarget.get(to.frame_id) || [];
-    return {
-      key: `${keyframes[index].frame_id}-${to.frame_id}`,
-      from: keyframes[index],
-      to,
-      frames: segmentFrames,
-      startLine: segmentFrames[0]?.csvLine ?? 0,
-      endLine: segmentFrames[segmentFrames.length - 1]?.csvLine ?? 0,
-    };
-  });
-}
-
-function errorToTarget(state, target) {
-  const pos = Math.hypot(target.x - state.x, target.y - state.y, target.z - state.z);
-  const rot = Math.hypot(target.yaw - state.yaw, target.pitch - state.pitch, target.roll - state.roll) * 0.2;
-  const grip = Math.abs(target.grip - state.grip) * 0.1;
-  return pos + rot + grip;
-}
-
-function stepPredictor(state, target, policy) {
-  const dt = RENDER_MS / 1000;
-  const kp = policy.kp_pos || DEFAULT_POLICY.kp_pos;
-  const kd = policy.kd_pos || DEFAULT_POLICY.kd_pos;
-  const speedScale = clamp(policy.speed_scale || DEFAULT_POLICY.speed_scale, 0.05, 1);
-  const maxSpeed = 1.25 * speedScale;
-  const maxAccel = 6.5;
-  let desiredVx = (target.x - state.x) * kp - state.vx * kd;
-  let desiredVy = (target.y - state.y) * kp - state.vy * kd;
-  let desiredVz = (target.z - state.z) * kp - state.vz * kd;
-  const desiredLen = Math.hypot(desiredVx, desiredVy, desiredVz);
-  if (desiredLen > maxSpeed) {
-    desiredVx = (desiredVx / desiredLen) * maxSpeed;
-    desiredVy = (desiredVy / desiredLen) * maxSpeed;
-    desiredVz = (desiredVz / desiredLen) * maxSpeed;
-  }
-
-  let dvx = desiredVx - state.vx;
-  let dvy = desiredVy - state.vy;
-  let dvz = desiredVz - state.vz;
-  const dvLen = Math.hypot(dvx, dvy, dvz);
-  const maxDv = maxAccel * dt;
-  if (dvLen > maxDv) {
-    dvx = (dvx / dvLen) * maxDv;
-    dvy = (dvy / dvLen) * maxDv;
-    dvz = (dvz / dvLen) * maxDv;
-  }
-
-  const vx = state.vx + dvx;
-  const vy = state.vy + dvy;
-  const vz = state.vz + dvz;
-  const next = {
-    ...state,
-    frame_t_ms: state.frame_t_ms + RENDER_MS,
-    x: state.x + vx * dt,
-    y: state.y + vy * dt,
-    z: state.z + vz * dt,
-    yaw: state.yaw + clamp((target.yaw - state.yaw) * (policy.kp_rot || DEFAULT_POLICY.kp_rot), -3.2 * dt * speedScale, 3.2 * dt * speedScale),
-    pitch: state.pitch + clamp((target.pitch - state.pitch) * (policy.kp_rot || DEFAULT_POLICY.kp_rot), -3.2 * dt * speedScale, 3.2 * dt * speedScale),
-    roll: state.roll + clamp((target.roll - state.roll) * (policy.kp_rot || DEFAULT_POLICY.kp_rot), -3.2 * dt * speedScale, 3.2 * dt * speedScale),
-    grip: clamp(state.grip + clamp((target.grip - state.grip) * (policy.kp_grip || DEFAULT_POLICY.kp_grip), -4.0 * dt * speedScale, 4.0 * dt * speedScale), 0, 1),
-    vx,
-    vy,
-    vz,
+function normalizePredictionFrame(frame, segmentType) {
+  return {
+    frame_t_ms: Number(frame.frame_t_ms),
+    target_frame: frame.target_frame,
+    x: Number(frame.palm_x),
+    y: Number(frame.palm_y),
+    z: Number(frame.palm_z),
+    yaw: Number(frame.yaw),
+    pitch: Number(frame.pitch),
+    roll: Number(frame.roll),
+    grip: Number(frame.grip),
+    csvLine: Number(frame.csvLine),
+    segmentType,
   };
-  next.error = errorToTarget(next, target);
-  next.confidence = clamp(0.65 + (1 - next.error) * 0.28, 0.35, 0.98);
-  return next;
+}
+
+function parsePredictionSegmentsJsonl(text) {
+  return text
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line, index) => {
+      const segment = JSON.parse(line);
+      const segmentType = segment.segment_type || "confirmed";
+      const frames = (segment.frames || []).map((frame) => normalizePredictionFrame(frame, segmentType));
+      return {
+        key: `${segment.segment_index ?? index}-${segmentType}-${segment.from?.frame_id ?? segment.from}-${segment.to?.frame_id ?? segment.to}`,
+        segmentIndex: Number(segment.segment_index ?? index),
+        segmentType,
+        source: segment.source || "loaded_segments",
+        from: segmentEndpoint(segment.from, `from_${index}`, segment.start_t_ms),
+        to: segmentEndpoint(segment.to, `to_${index}`, segment.target_t_ms),
+        confidence: Number(segment.confidence ?? 0.95),
+        isPredictedTarget: Boolean(segment.is_predicted_target),
+        isCorrected: Boolean(segment.is_corrected),
+        framesBetweenKeyframes: Number(segment.frames_between_keyframes ?? Math.max(0, frames.length - 1)),
+        frames,
+        startLine: frames[0]?.csvLine ?? 0,
+        endLine: frames[frames.length - 1]?.csvLine ?? 0,
+      };
+    });
+}
+
+function flattenPredictionSegments(segments) {
+  return segments.flatMap((segment) => segment.frames);
+}
+
+function makeFrameState(nextFrame, previous, sequenceResult) {
+  const dt = previous ? Math.max((nextFrame.frame_t_ms - previous.frame_t_ms) / 1000, 0.001) : RENDER_MS / 1000;
+  return {
+    frame_t_ms: nextFrame.frame_t_ms,
+    targetIndex: 0,
+    x: nextFrame.x,
+    y: nextFrame.y,
+    z: nextFrame.z,
+    yaw: nextFrame.yaw,
+    pitch: nextFrame.pitch,
+    roll: nextFrame.roll,
+    grip: nextFrame.grip,
+    vx: previous ? (nextFrame.x - previous.x) / dt : 0,
+    vy: previous ? (nextFrame.y - previous.y) / dt : 0,
+    vz: previous ? (nextFrame.z - previous.z) / dt : 0,
+    error: sequenceResult?.final_error ?? 0,
+    confidence: sequenceResult?.success ? 1 : 0.85,
+    csvLine: nextFrame.csvLine,
+    anchorLoop: 1,
+    target_frame: nextFrame.target_frame,
+    keyframeLock: false,
+  };
+}
+
+function formatPredictionCsvRow(frame) {
+  return [
+    Number(frame.frame_t_ms).toFixed(3).replace(/\.000$/, ""),
+    frame.target_frame,
+    frame.x.toFixed(6),
+    frame.y.toFixed(6),
+    frame.z.toFixed(6),
+    frame.yaw.toFixed(6),
+    frame.pitch.toFixed(6),
+    frame.roll.toFixed(6),
+    frame.grip.toFixed(6),
+  ].join(",");
 }
 
 function makeMaterial(color) {
@@ -369,20 +328,21 @@ function HandFallback({ frame }) {
 
 function App() {
   const mountRef = useRef(null);
-  const [keyframeCsv, setKeyframeCsv] = useState("");
   const [keyframes, setKeyframes] = useState([]);
   const [policy, setPolicy] = useState(DEFAULT_POLICY);
-  const [sequenceCsv, setSequenceCsv] = useState("");
+  const [sequenceSegments, setSequenceSegments] = useState([]);
   const [sequenceFrames, setSequenceFrames] = useState([]);
   const [sequenceResult, setSequenceResult] = useState(null);
   const [sequenceStatus, setSequenceStatus] = useState("waiting");
+  const segmentsTextRef = useRef("");
+  const predictionSegmentsRef = useRef([]);
+  const segmentPlaybackRef = useRef({ segmentIndex: 0, startTime: 0, lastFrameIndex: -1 });
   const [dataStatus, setDataStatus] = useState("loading");
   const frameRef = useRef(null);
   const keyframeCsvRef = useRef("");
   const keyframeScrollRef = useRef(null);
   const activeKeyframeRowRef = useRef(null);
   const [frame, setFrame] = useState(frameRef.current);
-  const sequenceIndexRef = useRef(0);
   const keyframeIndexRef = useRef(0);
   const keyframeTickRef = useRef(0);
   const [running, setRunning] = useState(true);
@@ -413,12 +373,15 @@ function App() {
         }
         const loadedKeyframes = parseCsv(csv);
         keyframeCsvRef.current = csv;
-        setKeyframeCsv(csv);
         setKeyframes(loadedKeyframes);
         setPolicy({ ...DEFAULT_POLICY, ...loadedPolicy });
-        frameRef.current = frameFromKeyframe(loadedKeyframes[0], 0);
-        setFrame(frameRef.current);
-        setDataStatus("loaded");
+        if (loadedKeyframes.length > 0) {
+          frameRef.current = frameFromKeyframe(loadedKeyframes[0], 0);
+          setFrame(frameRef.current);
+          setDataStatus("loaded");
+        } else {
+          setDataStatus("waiting for keyframe");
+        }
       })
       .catch(() => {
         if (!cancelled) {
@@ -446,14 +409,13 @@ function App() {
           }
           const loadedKeyframes = parseCsv(csv);
           keyframeCsvRef.current = csv;
-          setKeyframeCsv(csv);
           setKeyframes(loadedKeyframes);
-          setSelectedKeyframeIndex((current) => Math.min(current, loadedKeyframes.length - 1));
-          if (!frameRef.current) {
+          setSelectedKeyframeIndex((current) => Math.max(0, Math.min(current, loadedKeyframes.length - 1)));
+          if (!frameRef.current && loadedKeyframes.length > 0) {
             frameRef.current = frameFromKeyframe(loadedKeyframes[0], 0);
             setFrame(frameRef.current);
           }
-          setDataStatus("loaded");
+          setDataStatus(loadedKeyframes.length > 0 ? "loaded" : "waiting for keyframe");
         })
         .catch(() => {
           if (!cancelled) {
@@ -470,47 +432,35 @@ function App() {
 
   useEffect(() => {
     let cancelled = false;
-    const loadSequence = () => {
-      fetch(`${SEQUENCE_URL}?t=${Date.now()}`, { cache: "no-store" })
+    const loadSegments = () => {
+      fetch(`${SEGMENTS_URL}?t=${Date.now()}`, { cache: "no-store" })
         .then((response) => {
           if (!response.ok) {
-            throw new Error(SEQUENCE_URL);
+            throw new Error(SEGMENTS_URL);
           }
           return response.text();
         })
-        .then((csv) => {
-          if (cancelled || csv === sequenceCsv) {
+        .then((text) => {
+          if (cancelled) {
             return;
           }
-          const frames = markSequenceKeyframes(parsePredictionCsv(csv), keyframes);
-          if (frames.length === 0) {
+          if (text === segmentsTextRef.current) {
+            setSequenceStatus("loaded");
             return;
           }
-          setSequenceCsv(csv);
+          const previousText = segmentsTextRef.current;
+          segmentsTextRef.current = text;
+          const segments = parsePredictionSegmentsJsonl(text);
+          const frames = flattenPredictionSegments(segments);
+          const isInitialLoad = previousText.length === 0;
+          setSequenceSegments(segments);
           setSequenceFrames(frames);
-          sequenceIndexRef.current = 0;
-          const first = frames[0];
-          if (playMode === "prediction") {
-            frameRef.current = {
-              frame_t_ms: first.frame_t_ms,
-              targetIndex: 0,
-              x: first.x,
-              y: first.y,
-              z: first.z,
-              yaw: first.yaw,
-              pitch: first.pitch,
-              roll: first.roll,
-              grip: first.grip,
-              vx: 0,
-              vy: 0,
-              vz: 0,
-              error: 0,
-              confidence: 1,
-              csvLine: first.csvLine,
-              anchorLoop: 1,
-              target_frame: first.target_frame,
-              keyframeLock: keyframes.some((keyframe) => keyframe.t_ms === Math.round(first.frame_t_ms)),
-            };
+          if (isInitialLoad) {
+            segmentPlaybackRef.current = { segmentIndex: 0, startTime: performance.now(), lastFrameIndex: -1 };
+          }
+          if (isInitialLoad && playMode === "prediction" && frames.length > 0) {
+            const first = frames[0];
+            frameRef.current = makeFrameState(first, null, null);
             setFrame(frameRef.current);
           }
           setSequenceStatus("loaded");
@@ -530,13 +480,13 @@ function App() {
         })
         .catch(() => {});
     };
-    loadSequence();
-    const timer = window.setInterval(loadSequence, 1000);
+    loadSegments();
+    const timer = window.setInterval(loadSegments, 1000);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [keyframes, playMode, sequenceCsv]);
+  }, [playMode]);
 
   useEffect(() => {
     if (!running || keyframes.length === 0 || !frameRef.current) {
@@ -560,54 +510,57 @@ function App() {
         return;
       }
 
-      if (sequenceFrames.length > 0) {
-        const currentIndex = sequenceIndexRef.current;
-        const nextIndex = nextSequenceIndexByTime(sequenceFrames, currentIndex, RENDER_MS);
-        const current = sequenceFrames[currentIndex];
-        const nextFrame = sequenceFrames[nextIndex];
+      const segments = predictionSegmentsRef.current;
+      if (segments.length > 0) {
+        const now = performance.now();
+        let playback = segmentPlaybackRef.current;
+        let segment = segments[playback.segmentIndex] || segments[0];
+        if (segment.frames.length === 0) {
+          return;
+        }
+        const segmentDuration = Math.max(1, segment.to.t_ms - segment.from.t_ms || ANCHOR_MS);
+        let elapsed = now - playback.startTime;
+        while (elapsed >= segmentDuration) {
+          if (playback.segmentIndex >= segments.length - 1) {
+            const lastFrameIndex = segment.frames.length - 1;
+            if (playback.lastFrameIndex !== lastFrameIndex) {
+              const nextFrame = segment.frames[lastFrameIndex];
+              const previous = frameRef.current;
+              const next = makeFrameState(nextFrame, previous, sequenceResult);
+              next.anchorLoop = 1;
+              frameRef.current = next;
+              setFrame(next);
+              segmentPlaybackRef.current = { ...playback, lastFrameIndex };
+            }
+            return;
+          }
+          const nextSegmentIndex = playback.segmentIndex + 1;
+          const overflow = elapsed - segmentDuration;
+          playback = { segmentIndex: nextSegmentIndex, startTime: now - overflow, lastFrameIndex: -1 };
+          segmentPlaybackRef.current = playback;
+          segment = segments[nextSegmentIndex];
+          if (segment.frames.length === 0) {
+            return;
+          }
+          const nextDuration = Math.max(1, segment.to.t_ms - segment.from.t_ms || ANCHOR_MS);
+          elapsed = overflow;
+          if (elapsed < nextDuration) {
+            break;
+          }
+        }
+        const ratio = Math.max(0, Math.min(elapsed / segmentDuration, 1));
+        const frameIndex = Math.min(segment.frames.length - 1, Math.floor(ratio * segment.frames.length));
+        if (frameIndex === playback.lastFrameIndex) {
+          return;
+        }
+        segmentPlaybackRef.current = { ...playback, lastFrameIndex: frameIndex };
+        const nextFrame = segment.frames[frameIndex];
         const previous = frameRef.current;
-        const dt = nextIndex === 0 ? RENDER_MS / 1000 : Math.max((nextFrame.frame_t_ms - current.frame_t_ms) / 1000, RENDER_MS / 1000);
-        const next = {
-          frame_t_ms: nextFrame.frame_t_ms,
-          targetIndex: 0,
-          x: nextFrame.x,
-          y: nextFrame.y,
-          z: nextFrame.z,
-          yaw: nextFrame.yaw,
-          pitch: nextFrame.pitch,
-          roll: nextFrame.roll,
-          grip: nextFrame.grip,
-          vx: previous ? (nextFrame.x - previous.x) / dt : 0,
-          vy: previous ? (nextFrame.y - previous.y) / dt : 0,
-          vz: previous ? (nextFrame.z - previous.z) / dt : 0,
-          error: sequenceResult?.final_error ?? 0,
-          confidence: sequenceResult?.success ? 1 : 0.85,
-          csvLine: nextFrame.csvLine,
-          anchorLoop: Math.floor(nextIndex / Math.max(sequenceFrames.length - 1, 1)) + 1,
-          target_frame: nextFrame.target_frame,
-          keyframeLock: keyframes.some((keyframe) => keyframe.t_ms === Math.round(nextFrame.frame_t_ms)),
-        };
-        sequenceIndexRef.current = nextIndex;
+        const next = makeFrameState(nextFrame, previous, sequenceResult);
+        next.anchorLoop = 1;
         frameRef.current = next;
         setFrame(next);
-        return;
       }
-
-      const current = frameRef.current;
-      const anchorStep = Math.floor(current.frame_t_ms / ANCHOR_MS);
-      const targetIndex = (anchorStep % (keyframes.length - 1)) + 1;
-      const anchorLoop = Math.floor(anchorStep / (keyframes.length - 1)) + 1;
-      const target = keyframes[targetIndex];
-      let next = stepPredictor({ ...current, targetIndex, anchorLoop }, target, policy);
-      next.targetIndex = targetIndex;
-      next.csvLine = targetIndex + 1;
-      next.anchorLoop = anchorLoop;
-      if (next.frame_t_ms > keyframes[keyframes.length - 1].t_ms && targetIndex === keyframes.length - 1 && next.error < target.tolerance) {
-        next = frameFromKeyframe(keyframes[0], 0);
-        next.anchorLoop = anchorLoop + 1;
-      }
-      frameRef.current = next;
-      setFrame(next);
     }, RENDER_MS);
     return () => window.clearInterval(timer);
   }, [keyframes, playMode, policy, running, selectedKeyframeIndex, sequenceFrames, sequenceResult]);
@@ -692,7 +645,7 @@ function App() {
     keyframeIndexRef.current = 0;
     keyframeTickRef.current = 0;
     setSelectedKeyframeIndex(0);
-    sequenceIndexRef.current = 0;
+    segmentPlaybackRef.current = { segmentIndex: 0, startTime: performance.now(), lastFrameIndex: -1 };
     setFrame(frameRef.current);
   }
 
@@ -708,8 +661,20 @@ function App() {
     setFrame(frameRef.current);
   }
 
-  const sequenceMode = playMode === "prediction" && sequenceFrames.length > 0;
-  const predictionSegments = useMemo(() => buildPredictionSegments(sequenceFrames, keyframes), [sequenceFrames, keyframes]);
+  const sequenceMode = playMode === "prediction";
+  const predictionSegments = sequenceSegments;
+
+  useEffect(() => {
+    const playableSegments = predictionSegments.filter((segment) => segment.frames.length > 0);
+    predictionSegmentsRef.current = playableSegments;
+    if (playableSegments.length === 0) {
+      return;
+    }
+    if (segmentPlaybackRef.current.segmentIndex >= playableSegments.length) {
+      segmentPlaybackRef.current = { segmentIndex: 0, startTime: performance.now(), lastFrameIndex: -1 };
+    }
+  }, [predictionSegments]);
+
   const frameKeyframeIndex = frame
     ? Math.max(
         0,
@@ -721,7 +686,10 @@ function App() {
     predictionSegments.findIndex((segment) => segment.frames.some((item) => item.csvLine === frame?.csvLine) || segment.to.frame_id === frame?.target_frame)
   );
   const activeSegment = predictionSegments[activeSegmentIndex];
-  const activeKeyframeIndex = sequenceMode ? activeSegmentIndex : frameKeyframeIndex;
+  const keyframeIndexById = useMemo(() => new Map(keyframes.map((item, index) => [item.frame_id, index])), [keyframes]);
+  const activeKeyframeIndex = sequenceMode
+    ? Math.max(0, keyframeIndexById.get(activeSegment?.from.frame_id) ?? keyframeIndexById.get(activeSegment?.to.frame_id) ?? frameKeyframeIndex)
+    : frameKeyframeIndex;
 
   useLayoutEffect(() => {
     const scroller = keyframeScrollRef.current;
@@ -753,7 +721,7 @@ function App() {
     ? { frame_id: frame.target_frame || "sequence", grip: frame.grip, tolerance: 0.001 }
     : keyframes[frame.targetIndex] || keyframes[0];
   const predictedGap = Math.floor(ANCHOR_MS / RENDER_MS);
-  const sequenceCsvRows = sequenceCsv.trim().split(/\r?\n/).filter(Boolean);
+  const sequenceCsvRows = ["frame_t_ms,target_frame,palm_x,palm_y,palm_z,yaw,pitch,roll,grip"].concat(sequenceFrames.map(formatPredictionCsvRow));
   const liveRows = [
     ["frame_t_ms", Number(frame.frame_t_ms).toFixed(3).replace(/\.000$/, "")],
     ["target", target.frame_id],
@@ -771,14 +739,14 @@ function App() {
     ["confidence", frame.confidence.toFixed(3)],
   ];
   const policyRows = [
-    ["source", sequenceMode ? "sequence csv" : "browser fallback"],
+    ["source", sequenceMode ? "implement segments" : "keyframe script"],
     ["frames", sequenceMode ? sequenceFrames.length : keyframes.length],
     ["status", sequenceStatus],
-    ["success", sequenceResult ? String(sequenceResult.success) : "-"],
-    ["completion", sequenceResult?.completion_rate !== undefined ? Number(sequenceResult.completion_rate).toFixed(3) : "-"],
-    ["trials", sequenceResult?.completion_trials ?? "-"],
-    ["error", sequenceResult ? Number(sequenceResult.final_error).toFixed(5) : "-"],
-    ["jump", sequenceResult ? Number(sequenceResult.max_position_jump).toFixed(4) : "-"],
+    ["success", "-"],
+    ["completion", "-"],
+    ["trials", "-"],
+    ["error", frame.error.toFixed(5)],
+    ["jump", Math.hypot(frame.vx, frame.vy, frame.vz).toFixed(4)],
   ];
 
   const toggleSegment = (key) => {
@@ -816,17 +784,17 @@ function App() {
             </div>
             <div>
               <span>implement</span>
-              <strong>{sequenceMode ? "CSV" : `${RENDER_MS}ms`}</strong>
+              <strong>{`${RENDER_MS}ms`}</strong>
             </div>
             <div>
               <span>fill</span>
-              <strong>{sequenceMode ? `${sequenceFrames.length}f` : `${predictedGap}/gap`}</strong>
+              <strong>{sequenceMode ? `${sequenceFrames.length} live` : `${predictedGap}/gap`}</strong>
             </div>
           </div>
 
           <div className="source-strip">
-            <span>{sequenceMode ? SEQUENCE_URL : KEYFRAME_URL}</span>
-            <span>{sequenceMode ? RESULT_URL : POLICY_URL}</span>
+            <span>{KEYFRAME_URL}</span>
+            <span>{sequenceMode ? SEGMENTS_URL : POLICY_URL}</span>
           </div>
 
           <div className="playback-panel">
@@ -865,15 +833,10 @@ function App() {
               </div>
               <div className="script-window keyframe-window" ref={keyframeScrollRef}>
                 {keyframes.map((item, keyframeIndex) => {
-                  const segment = predictionSegments[keyframeIndex];
+                  const segmentsForKeyframe = predictionSegments.filter(
+                    (segment) => segment.from.frame_id === item.frame_id || (segment.segmentType === "correction" && segment.to.frame_id === item.frame_id)
+                  );
                   const isActive = keyframeIndex === activeKeyframeIndex;
-                  const isOpen = segment ? Boolean(expandedSegments[segment.key]) : false;
-                  const segmentActiveIndex = segment ? Math.max(0, segment.frames.findIndex((prediction) => prediction.csvLine === frame.csvLine)) : 0;
-                  const windowStart = segment && keyframeIndex === activeSegmentIndex ? Math.max(0, segmentActiveIndex - PREDICTION_WINDOW_BEFORE) : 0;
-                  const windowEnd = segment && keyframeIndex === activeSegmentIndex
-                    ? Math.min(segment.frames.length, segmentActiveIndex + PREDICTION_WINDOW_AFTER + 1)
-                    : Math.min(segment?.frames.length ?? 0, 24);
-                  const visibleFrames = segment ? segment.frames.slice(windowStart, windowEnd) : [];
                   return (
                     <div className={isActive ? "keyframe-script-group active" : "keyframe-script-group"} key={item.frame_id}>
                       <button type="button" className={isActive ? "keyframe active" : "keyframe"} onClick={() => showKeyframe(keyframeIndex)} ref={isActive ? activeKeyframeRowRef : null}>
@@ -881,45 +844,55 @@ function App() {
                         <strong>{item.frame_id}</strong>
                         <em>{item.grip.toFixed(2)}</em>
                       </button>
-                      {sequenceMode && segment ? (
-                        <div className="keyframe-prediction-block">
-                          <button type="button" className="segment-toggle" onClick={() => toggleSegment(segment.key)}>
-                            {isOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-                            <span>prediction</span>
-                            <strong>{segment.frames.length} rows</strong>
-                            <span>{segment.to.frame_id}</span>
-                          </button>
-                          {isOpen ? (
-                            <div className="predicted-list">
-                              <div className="script-row header">
-                                <span>#</span>
-                                <code>{sequenceCsvRows[0] || "frame_t_ms,target_frame,palm_x,palm_y,palm_z,yaw,pitch,roll,grip"}</code>
-                              </div>
-                              {visibleFrames.map((prediction) => {
-                                const predictionRow = sequenceCsvRows[prediction.csvLine - 1] || "";
-                                const isActivePrediction = prediction.csvLine === frame.csvLine;
-                                return (
-                                  <div className={isActivePrediction ? "script-row prediction-row active" : "script-row prediction-row"} key={`${prediction.csvLine}-${prediction.frame_t_ms}`}>
-                                    <span>{prediction.csvLine}</span>
-                                    <code>{predictionRow}</code>
+                      {sequenceMode
+                        ? segmentsForKeyframe.map((segment) => {
+                            const isOpen = Boolean(expandedSegments[segment.key]);
+                            const isActiveSegment = segment.segmentIndex === activeSegment?.segmentIndex;
+                            const segmentActiveIndex = Math.max(0, segment.frames.findIndex((prediction) => prediction.csvLine === frame.csvLine));
+                            const windowStart = isActiveSegment ? Math.max(0, segmentActiveIndex - PREDICTION_WINDOW_BEFORE) : 0;
+                            const windowEnd = isActiveSegment ? Math.min(segment.frames.length, segmentActiveIndex + PREDICTION_WINDOW_AFTER + 1) : Math.min(segment.frames.length, 24);
+                            const visibleFrames = segment.frames.slice(windowStart, windowEnd);
+                            return (
+                              <div className="keyframe-prediction-block" key={segment.key}>
+                                <button type="button" className={`segment-toggle ${segment.segmentType}`} onClick={() => toggleSegment(segment.key)}>
+                                  {isOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                                  <span>{segment.segmentType}</span>
+                                  <strong>{segment.frames.length} rows</strong>
+                                  <span>{segment.to.frame_id}</span>
+                                </button>
+                                {isOpen ? (
+                                  <div className="predicted-list">
+                                    <div className="script-row header">
+                                      <span>#</span>
+                                      <code>{sequenceCsvRows[0] || "frame_t_ms,target_frame,palm_x,palm_y,palm_z,yaw,pitch,roll,grip"}</code>
+                                    </div>
+                                    {visibleFrames.map((prediction) => {
+                                      const predictionRow = sequenceCsvRows[prediction.csvLine - 1] || "";
+                                      const isActivePrediction = prediction.csvLine === frame.csvLine;
+                                      return (
+                                        <div className={isActivePrediction ? "script-row prediction-row active" : "script-row prediction-row"} key={`${prediction.csvLine}-${prediction.frame_t_ms}`}>
+                                          <span>{prediction.csvLine}</span>
+                                          <code>{predictionRow}</code>
+                                        </div>
+                                      );
+                                    })}
+                                    {segment.frames.length > visibleFrames.length ? (
+                                      <div className="window-range">
+                                        rows {segment.startLine + windowStart}-{segment.startLine + windowEnd - 1} of {segment.startLine}-{segment.endLine}
+                                      </div>
+                                    ) : null}
                                   </div>
-                                );
-                              })}
-                              {segment.frames.length > visibleFrames.length ? (
-                                <div className="window-range">
-                                  rows {segment.startLine + windowStart}-{segment.startLine + windowEnd - 1} of {segment.startLine}-{segment.endLine}
-                                </div>
-                              ) : null}
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : null}
+                                ) : null}
+                              </div>
+                            );
+                          })
+                        : null}
                     </div>
                   );
                 })}
               </div>
               <div className="window-range">
-                segment {activeSegmentIndex + 1}/{predictionSegments.length}: {activeSegment?.from.frame_id ?? "-"} - {activeSegment?.to.frame_id ?? "-"}
+                segment {predictionSegments.length ? activeSegmentIndex + 1 : 0}/{predictionSegments.length}: {activeSegment?.segmentType ?? "-"} {activeSegment?.from.frame_id ?? "-"} - {activeSegment?.to.frame_id ?? "-"}
               </div>
             </div>
           </div>

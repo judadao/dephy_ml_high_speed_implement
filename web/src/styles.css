@@ -392,6 +392,18 @@ button.keyframe {
   text-align: center;
 }
 
+.segment-toggle.bootstrap {
+  box-shadow: inset 3px 0 0 #eab308;
+}
+
+.segment-toggle.confirmed {
+  box-shadow: inset 3px 0 0 #14b8a6;
+}
+
+.segment-toggle.correction {
+  box-shadow: inset 3px 0 0 #f97316;
+}
+
 .predicted-list {
   display: grid;
   gap: 4px;
