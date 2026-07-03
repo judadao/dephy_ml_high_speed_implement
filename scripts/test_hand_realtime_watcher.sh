@@ -40,6 +40,28 @@ grep -q '"success": true' "$outdir/result.json"
 grep -q '"format":"dephy_bootstrap_prior_sample_v1"' "$outdir/bootstrap_samples.jsonl"
 grep -q '"state": "stopped"' "$outdir/result.json"
 
+python3 scripts/generate_runtime_io.py \
+    --sample-keyframes "$outdir/keyframes.csv" \
+    --out "$outdir/runtime_io.csv" \
+    --seed 616 \
+    --noise-scale 1.0
+python3 scripts/runtime_io_to_anchor.py \
+    --runtime-io "$outdir/runtime_io.csv" \
+    --out "$outdir/runtime_anchors.jsonl"
+python3 scripts/dephy_hand_realtime_watcher.py \
+    --anchors "$outdir/runtime_anchors.jsonl" \
+    --model "$model_dir/model.json" \
+    --out "$outdir/anchor_segments.jsonl" \
+    --result "$outdir/anchor_result.json" \
+    --render-ms 16 \
+    --sample-ms 10 \
+    --frames 20 \
+    --poll-ms 20 \
+    --max-keyframes 4 \
+    --truncate
+grep -q '"anchors_seen": 4' "$outdir/anchor_result.json"
+grep -q '"from_anchor"' "$outdir/anchor_segments.jsonl"
+
 cp "$outdir/keyframes.csv" "$outdir/keyframes_partial.csv"
 printf 'partial,999,' >> "$outdir/keyframes_partial.csv"
 python3 scripts/dephy_hand_realtime_watcher.py \

@@ -20,6 +20,10 @@
     "source": { "type": "string" },
     "from": { "$ref": "#/$defs/endpoint" },
     "to": { "$ref": "#/$defs/endpoint" },
+    "from_anchor": { "$ref": "#/$defs/anchor_endpoint" },
+    "to_anchor": { "$ref": "#/$defs/anchor_endpoint" },
+    "anchor_source": { "type": "string" },
+    "target_kind": { "enum": ["observed_anchor", "predicted_anchor"] },
     "start_t_ms": { "type": "integer", "minimum": 0 },
     "target_t_ms": { "type": "integer", "minimum": 0 },
     "frames_between_keyframes": { "type": "integer", "minimum": 0 },
@@ -38,6 +42,18 @@
       "properties": {
         "frame_id": { "type": "string" },
         "t_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "anchor_endpoint": {
+      "type": "object",
+      "required": ["anchor_id", "frame_id", "t_ms", "source", "target_kind"],
+      "properties": {
+        "anchor_id": { "type": "string" },
+        "frame_id": { "type": "string" },
+        "t_ms": { "type": "integer", "minimum": 0 },
+        "source": { "type": "string" },
+        "target_kind": { "enum": ["observed_anchor", "predicted_anchor"] },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
       }
     },
     "frame": {

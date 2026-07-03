@@ -86,3 +86,24 @@ items:
   - id: realtime_web_queue
     title: Update web to play growing JSONL segments and counters
     status: done
+  - id: realtime_web_sse
+    title: Replace web timer polling with Server-Sent Events
+    status: done
+  - id: realtime_io_device_hand_e2e
+    title: Add cross-repo realtime hand e2e check with linux_io_device_simul
+    status: done
+  - id: runtime_anchor_data_contract
+    title: Separate sample keyframes from runtime IO anchors
+    status: done
+  - id: runtime_io_adapter
+    title: Add runtime IO generator and IO-to-anchor adapter
+    status: done
+  - id: watcher_anchor_input
+    title: Make realtime watcher consume anchors as official runtime input
+    status: done
+  - id: web_runtime_anchor_layout
+    title: Split web demo into runtime anchors, prediction, and reference samples
+    status: done
+  - id: learned_bootstrap_model
+    title: Replace lightweight bootstrap prior with fuller learned model
+    status: pending_discussion

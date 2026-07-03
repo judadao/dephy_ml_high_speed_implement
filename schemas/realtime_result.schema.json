@@ -22,6 +22,7 @@
     "model": { "type": ["string", "null"] },
     "updated_at_ms": { "type": "integer", "minimum": 0 },
     "keyframes_seen": { "type": "integer", "minimum": 0 },
+    "anchors_seen": { "type": "integer", "minimum": 0 },
     "segments_written": { "type": "integer", "minimum": 0 },
     "bootstrap_segments": { "type": "integer", "minimum": 0 },
     "confirmed_segments": { "type": "integer", "minimum": 0 },

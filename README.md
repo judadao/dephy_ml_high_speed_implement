@@ -275,17 +275,22 @@ CSV also keeps the exact keyframe anchor rows, so five keyframes produce
 `5 + (5 - 1) * 1000 = 4005` rows. Omit `--frames` to fall back to the
 lower-rate `--render-ms` spacing.
 
-## Realtime Keyframe Append Flow
+## Realtime Runtime Anchor Flow
 
-The production direction is the append flow. The device or simulator is the
-low-rate truth source, and implement owns all high-rate prediction:
+The production direction separates training/reference samples from runtime
+input. Sample keyframes are reference/training data. Runtime IO anchors are the
+low-rate truth source during a demo or real run. Implement owns all high-rate
+prediction:
 
 ```txt
-simul/device input
-  -> realtime keyframe append
-  -> implement watches the keyframe stream
-  -> first keyframe A creates a bootstrap guess
-  -> each new keyframe B creates A-to-B prediction
+sample_keyframes.csv       training/reference only
+
+simul/device runtime IO
+  -> runtime_io.csv
+  -> runtime_anchors.jsonl
+  -> implement watches runtime anchors
+  -> first observed anchor A creates a bootstrap guess
+  -> each new observed anchor B creates A-to-B prediction
   -> optional correction segment reconciles a bad bootstrap guess
   -> append prediction_segments.jsonl
   -> web or downstream consumers reload the appended result
@@ -293,12 +298,13 @@ simul/device input
 
 The watcher keeps three segment types:
 
-- `bootstrap`: only keyframe A exists, so the model uses a low-confidence
+- `bootstrap`: only observed anchor A exists, so the model uses a low-confidence
   prior/extrapolation and guesses the next target.
-- `confirmed`: real keyframe A and B are both known; the final prediction frame
+- `confirmed`: real observed anchors A and B are both known; the final prediction
+  frame
   must match B exactly.
 - `correction`: the bootstrap target was wrong enough to need a smooth segment
-  back to the real keyframe.
+  back to the real observed anchor.
 
 Run a finite local realtime demo:
 
@@ -316,11 +322,22 @@ make -f Makefile.linux bootstrap-prior-check
 The raw commands are:
 
 ```sh
-KEYFRAME_COUNT=16 SAMPLE_MS=300 LOOP=1 \
-  sh scripts/run_hand_realtime_keyframe_simul.sh web/public/demo/hand_keyframes.csv
+python3 scripts/generate_random_hand_keyframes.py \
+  --out web/public/demo/sample_keyframes.csv \
+  --count 16 \
+  --sample-ms 300 \
+  --mode grasp_can
+
+python3 scripts/generate_runtime_io.py \
+  --sample-keyframes web/public/demo/sample_keyframes.csv \
+  --out web/public/demo/runtime_io.csv
+
+python3 scripts/runtime_io_to_anchor.py \
+  --runtime-io web/public/demo/runtime_io.csv \
+  --out web/public/demo/runtime_anchors.jsonl
 
 python3 scripts/dephy_hand_realtime_watcher.py \
-  --keyframes web/public/demo/hand_keyframes.csv \
+  --anchors web/public/demo/runtime_anchors.jsonl \
   --model build_out/hand_sequence/model.json \
   --out web/public/demo/hand_sequence/prediction_segments.jsonl \
   --result web/public/demo/hand_sequence/result.json \
@@ -340,7 +357,8 @@ make -f Makefile.linux web-realtime-service
 The watcher is safe for append-style files:
 
 - It ignores incomplete trailing CSV rows while a writer is in the middle of a
-  line.
+  line in compatibility `--keyframes` mode, and incomplete JSONL rows in
+  `--anchors` mode.
 - `--resume` reads existing `prediction_segments.jsonl` and continues
   `segment_index` and `csvLine` instead of duplicating old segments.
 - `--bootstrap-samples build_out/runtime/bootstrap_samples.jsonl` records
@@ -365,10 +383,21 @@ Bridge from the sibling IO simulator when it is available:
 SAMPLE_MS=300 LOOP=1 \
   sh scripts/run_io_device_realtime_bridge.sh \
   ../linux_io_device_simul/scripts/hand_keyframe_demo.script \
-  web/public/demo/hand_keyframes.csv
+  web/public/demo/sample_keyframes.csv
 ```
 
 If the simulator path is different, set `SIMUL_BIN=/path/to/linux_io_device_simul`.
+
+Run the cross-repo realtime hand e2e check:
+
+```sh
+make -f Makefile.linux io-device-realtime-hand-check
+```
+
+That check builds the sibling `linux_io_device_simul` repo, records its
+`hand_keyframe_demo.script` stream into sample keyframes, generates runtime IO
+and runtime anchors, runs the realtime watcher with `--anchors`, and verifies
+bootstrap plus confirmed prediction segments.
 
 `prediction_segments.jsonl` is append-only during a realtime run. Each JSONL
 line is a complete segment with metadata:
@@ -379,6 +408,8 @@ line is a complete segment with metadata:
   "segment_type": "confirmed",
   "from": {"frame_id": "kf_0001", "t_ms": 300},
   "to": {"frame_id": "kf_0002", "t_ms": 600},
+  "from_anchor": {"anchor_id": "runtime_io_0001", "target_kind": "observed_anchor"},
+  "to_anchor": {"anchor_id": "runtime_io_0002", "target_kind": "observed_anchor"},
   "frames_between_keyframes": 1000,
   "confidence": 0.98,
   "frames": []
@@ -386,22 +417,27 @@ line is a complete segment with metadata:
 ```
 
 `result.json` is only a status summary. It records counters such as
-`keyframes_seen`, `bootstrap_segments`, `confirmed_segments`,
+`anchors_seen`, `bootstrap_segments`, `confirmed_segments`,
 `correction_segments`, `prediction_frames`, and segment-local smoothness
-metrics. Consumers should treat `keyframes.csv` and `prediction_segments.jsonl`
-as the data source.
+metrics. Consumers should treat `runtime_anchors.jsonl` and
+`prediction_segments.jsonl` as the runtime data source.
 
 Realtime data contracts are documented in:
 
 - `schemas/prediction_segment.schema.json`
 - `schemas/realtime_result.schema.json`
 - `schemas/bootstrap_prior_sample.schema.json`
+- `schemas/runtime_anchor.schema.json`
+
+The next model step is a fuller learned bootstrap prior. The current repo keeps
+the data collection and lightweight prior export in place, but the larger model
+design is intentionally left for a separate discussion.
 
 ## Web Hand Demo
 
 The Vite web demo visualizes the single-palm scope. The left side renders hand
-joint points and bones. The right side shows a CSV keyframe stream that behaves
-like a simulator sending one anchor every 300ms, while the implement side
+joint points and bones. The right side shows runtime IO anchors that behave
+like a simulator sending one observed anchor every 300ms, while the implement side
 appends prediction segment batches between anchors.
 
 ```sh
@@ -411,22 +447,28 @@ make -f Makefile.linux web
 
 Then open `http://127.0.0.1:8091/`.
 
-The web demo is a realtime playback surface. It polls these served files once
-per second:
+The web demo is a realtime playback surface. In Vite dev mode it subscribes to
+`/demo/events` with Server-Sent Events. The dev server watches these files and
+pushes updates whenever implement appends new data:
 
 ```txt
-web/public/demo/hand_keyframes.csv
+web/public/demo/sample_keyframes.csv
+web/public/demo/runtime_io.csv
+web/public/demo/runtime_anchors.jsonl
 web/public/demo/hand_policy.json
 web/public/demo/hand_sequence/prediction_segments.jsonl
 web/public/demo/hand_sequence/result.json
 ```
 
 The browser does not run the prediction model. The implement side receives the
-300ms keyframe anchors and appends prediction segments. The first keyframe can
-produce a `bootstrap` segment before the next real keyframe arrives. Later real
-keyframes produce `confirmed` segments, and large bootstrap misses can add
+300ms runtime anchors and appends prediction segments. The first anchor can
+produce a `bootstrap` segment before the next real anchor arrives. Later real
+anchors produce `confirmed` segments, and large bootstrap misses can add
 `correction` segments. The web page only loads those segment batches, plays
-them, and folds the intermediate rows under the related keyframe for inspection.
+them, and folds the intermediate rows under the related runtime anchor for inspection.
+If SSE is unavailable, the page performs a one-shot load so static render checks
+still work, but live demo updates are expected to use EventSource rather than
+timer polling.
 
 The default web scene focuses on a smooth hand fist: the hand starts open,
 closes into a fist, holds briefly, releases, and returns to the original pose.
@@ -436,8 +478,11 @@ enough keyframes to generate a smooth open-close-open motion.
 The active demo data is loaded from external fixtures instead of being hardcoded
 inside React:
 
-- `web/public/demo/hand_keyframes.csv`: generated random noisy test keyframes
+- `web/public/demo/sample_keyframes.csv`: reference/training sample keyframes
   for the current web run.
+- `web/public/demo/runtime_io.csv`: simulated runtime IO observations with noise.
+- `web/public/demo/runtime_anchors.jsonl`: normalized runtime anchors consumed
+  by implement.
 - `examples/hand/hand_policy.json`: source prediction policy parameters.
 - `web/public/demo/hand_sequence/prediction_segments.jsonl`: implement output.
   Each line is one bootstrap, confirmed, or correction batch with 1000 predicted
@@ -474,6 +519,12 @@ WEB_SEED=222 NOISE_SCALE=1.5 KEYFRAME_COUNT=64 FRAMES=1000 make -f Makefile.linu
 For offline model checks, `make -f Makefile.linux hand-sequence-check` and
 `make -f Makefile.linux web-sequence-demo-loop` can still generate prediction
 artifacts. The web loop uses the same segment JSONL format as the browser demo.
+
+Validate the SSE endpoint:
+
+```sh
+make -f Makefile.linux web-sse-check
+```
 
 The intended device-to-implement path is:
 

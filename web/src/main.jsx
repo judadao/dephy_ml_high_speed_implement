@@ -6,7 +6,9 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { buildHandJoints, FINGER_JOINTS, FINGERS, HAND_SCALE, SCENE_Y_OFFSET } from "./handRig.js";
 import "./styles.css";
 
-const KEYFRAME_URL = "/demo/hand_keyframes.csv";
+const SAMPLE_KEYFRAME_URL = "/demo/sample_keyframes.csv";
+const KEYFRAME_URL = SAMPLE_KEYFRAME_URL;
+const RUNTIME_ANCHORS_URL = "/demo/runtime_anchors.jsonl";
 const POLICY_URL = "/demo/hand_policy.json";
 const SEGMENTS_URL = "/demo/hand_sequence/prediction_segments.jsonl";
 const RESULT_URL = "/demo/hand_sequence/result.json";
@@ -47,6 +49,32 @@ function parseCsv(text) {
       safety_hold: Number(item.safety_hold),
     };
   });
+}
+
+function parseRuntimeAnchorsJsonl(text) {
+  return text
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => {
+      const anchor = JSON.parse(line);
+      const pose = anchor.observed_pose || {};
+      return {
+        frame_id: anchor.anchor_id,
+        anchor_id: anchor.anchor_id,
+        t_ms: Number(anchor.t_ms),
+        x: Number(pose.x),
+        y: Number(pose.y),
+        z: Number(pose.z),
+        yaw: Number(pose.yaw),
+        pitch: Number(pose.pitch),
+        roll: Number(pose.roll),
+        grip: Number(pose.grip),
+        confidence: Number(anchor.confidence ?? 0.85),
+        jitter: Number(anchor.jitter ?? 0),
+        source: anchor.source || "runtime_anchor",
+      };
+    });
 }
 
 function initialState(keyframe) {
@@ -328,7 +356,8 @@ function HandFallback({ frame }) {
 
 function App() {
   const mountRef = useRef(null);
-  const [keyframes, setKeyframes] = useState([]);
+  const [sampleKeyframes, setSampleKeyframes] = useState([]);
+  const [runtimeAnchors, setRuntimeAnchors] = useState([]);
   const [policy, setPolicy] = useState(DEFAULT_POLICY);
   const [sequenceSegments, setSequenceSegments] = useState([]);
   const [sequenceFrames, setSequenceFrames] = useState([]);
@@ -340,6 +369,7 @@ function App() {
   const [dataStatus, setDataStatus] = useState("loading");
   const frameRef = useRef(null);
   const keyframeCsvRef = useRef("");
+  const runtimeAnchorsTextRef = useRef("");
   const keyframeScrollRef = useRef(null);
   const activeKeyframeRowRef = useRef(null);
   const [frame, setFrame] = useState(frameRef.current);
@@ -350,6 +380,65 @@ function App() {
   const [selectedKeyframeIndex, setSelectedKeyframeIndex] = useState(0);
   const [renderError, setRenderError] = useState("");
   const [expandedSegments, setExpandedSegments] = useState({});
+
+  const keyframes = runtimeAnchors;
+
+  function applySampleKeyframesText(csv) {
+    if (csv === keyframeCsvRef.current) {
+      return;
+    }
+    const loadedKeyframes = parseCsv(csv);
+    keyframeCsvRef.current = csv;
+    setSampleKeyframes(loadedKeyframes);
+  }
+
+  function applyRuntimeAnchorsText(text) {
+    if (text === runtimeAnchorsTextRef.current) {
+      return;
+    }
+    const loadedAnchors = parseRuntimeAnchorsJsonl(text);
+    runtimeAnchorsTextRef.current = text;
+    setRuntimeAnchors(loadedAnchors);
+    setSelectedKeyframeIndex((current) => Math.max(0, Math.min(current, loadedAnchors.length - 1)));
+    if (!frameRef.current && loadedAnchors.length > 0) {
+      frameRef.current = frameFromKeyframe(loadedAnchors[0], 0);
+      setFrame(frameRef.current);
+    }
+    setDataStatus(loadedAnchors.length > 0 ? "runtime anchors loaded" : "waiting for runtime anchor");
+  }
+
+  function applySegmentsText(text) {
+    if (text === segmentsTextRef.current) {
+      setSequenceStatus("sse loaded");
+      return;
+    }
+    const previousText = segmentsTextRef.current;
+    segmentsTextRef.current = text;
+    const segments = parsePredictionSegmentsJsonl(text);
+    const frames = flattenPredictionSegments(segments);
+    const isInitialLoad = previousText.length === 0;
+    setSequenceSegments(segments);
+    setSequenceFrames(frames);
+    if (isInitialLoad) {
+      segmentPlaybackRef.current = { segmentIndex: 0, startTime: performance.now(), lastFrameIndex: -1 };
+    }
+    if (isInitialLoad && playMode === "prediction" && frames.length > 0) {
+      const first = frames[0];
+      frameRef.current = makeFrameState(first, null, null);
+      setFrame(frameRef.current);
+    }
+    setSequenceStatus("sse loaded");
+  }
+
+  function applyPolicyText(text) {
+    setPolicy({ ...DEFAULT_POLICY, ...JSON.parse(text) });
+  }
+
+  function applyResultText(text) {
+    if (text.trim()) {
+      setSequenceResult(JSON.parse(text));
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -371,17 +460,8 @@ function App() {
         if (cancelled) {
           return;
         }
-        const loadedKeyframes = parseCsv(csv);
-        keyframeCsvRef.current = csv;
-        setKeyframes(loadedKeyframes);
+        applySampleKeyframesText(csv);
         setPolicy({ ...DEFAULT_POLICY, ...loadedPolicy });
-        if (loadedKeyframes.length > 0) {
-          frameRef.current = frameFromKeyframe(loadedKeyframes[0], 0);
-          setFrame(frameRef.current);
-          setDataStatus("loaded");
-        } else {
-          setDataStatus("waiting for keyframe");
-        }
       })
       .catch(() => {
         if (!cancelled) {
@@ -395,96 +475,77 @@ function App() {
 
   useEffect(() => {
     let cancelled = false;
-    const loadKeyframes = () => {
-      fetch(`${KEYFRAME_URL}?t=${Date.now()}`, { cache: "no-store" })
-        .then((response) => {
-          if (!response.ok) {
-            throw new Error(KEYFRAME_URL);
-          }
-          return response.text();
-        })
-        .then((csv) => {
-          if (cancelled || csv === keyframeCsvRef.current) {
-            return;
-          }
-          const loadedKeyframes = parseCsv(csv);
-          keyframeCsvRef.current = csv;
-          setKeyframes(loadedKeyframes);
-          setSelectedKeyframeIndex((current) => Math.max(0, Math.min(current, loadedKeyframes.length - 1)));
-          if (!frameRef.current && loadedKeyframes.length > 0) {
-            frameRef.current = frameFromKeyframe(loadedKeyframes[0], 0);
-            setFrame(frameRef.current);
-          }
-          setDataStatus(loadedKeyframes.length > 0 ? "loaded" : "waiting for keyframe");
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setDataStatus("load error");
-          }
-        });
-    };
-    const timer = window.setInterval(loadKeyframes, 1000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    const loadSegments = () => {
-      fetch(`${SEGMENTS_URL}?t=${Date.now()}`, { cache: "no-store" })
-        .then((response) => {
-          if (!response.ok) {
-            throw new Error(SEGMENTS_URL);
-          }
-          return response.text();
-        })
-        .then((text) => {
+    const fetchOnce = () => {
+      Promise.all([
+        fetch(SAMPLE_KEYFRAME_URL, { cache: "no-store" }).then((response) => (response.ok ? response.text() : "")),
+        fetch(RUNTIME_ANCHORS_URL, { cache: "no-store" }).then((response) => (response.ok ? response.text() : "")),
+        fetch(SEGMENTS_URL, { cache: "no-store" }).then((response) => (response.ok ? response.text() : "")),
+        fetch(RESULT_URL, { cache: "no-store" }).then((response) => (response.ok ? response.text() : "")),
+      ])
+        .then(([sampleText, anchorText, segmentText, resultText]) => {
           if (cancelled) {
             return;
           }
-          if (text === segmentsTextRef.current) {
-            setSequenceStatus("loaded");
-            return;
+          if (sampleText) {
+            applySampleKeyframesText(sampleText);
           }
-          const previousText = segmentsTextRef.current;
-          segmentsTextRef.current = text;
-          const segments = parsePredictionSegmentsJsonl(text);
-          const frames = flattenPredictionSegments(segments);
-          const isInitialLoad = previousText.length === 0;
-          setSequenceSegments(segments);
-          setSequenceFrames(frames);
-          if (isInitialLoad) {
-            segmentPlaybackRef.current = { segmentIndex: 0, startTime: performance.now(), lastFrameIndex: -1 };
+          if (anchorText) {
+            applyRuntimeAnchorsText(anchorText);
           }
-          if (isInitialLoad && playMode === "prediction" && frames.length > 0) {
-            const first = frames[0];
-            frameRef.current = makeFrameState(first, null, null);
-            setFrame(frameRef.current);
+          if (segmentText) {
+            applySegmentsText(segmentText);
           }
-          setSequenceStatus("loaded");
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setSequenceStatus("waiting");
-          }
-        });
-
-      fetch(`${RESULT_URL}?t=${Date.now()}`, { cache: "no-store" })
-        .then((response) => (response.ok ? response.json() : null))
-        .then((result) => {
-          if (!cancelled && result) {
-            setSequenceResult(result);
+          if (resultText) {
+            applyResultText(resultText);
           }
         })
         .catch(() => {});
     };
-    loadSegments();
-    const timer = window.setInterval(loadSegments, 1000);
+
+    fetchOnce();
+    if (!window.EventSource) {
+      setSequenceStatus("sse unavailable");
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const events = new EventSource("/demo/events");
+    events.addEventListener("open", () => setSequenceStatus("sse connected"));
+    events.addEventListener("ready", () => setSequenceStatus("sse connected"));
+    events.addEventListener("sample_keyframes", (event) => {
+      if (!cancelled) {
+        applySampleKeyframesText(JSON.parse(event.data));
+      }
+    });
+    events.addEventListener("runtime_anchors", (event) => {
+      if (!cancelled) {
+        applyRuntimeAnchorsText(JSON.parse(event.data));
+      }
+    });
+    events.addEventListener("policy", (event) => {
+      if (!cancelled) {
+        applyPolicyText(JSON.parse(event.data));
+      }
+    });
+    events.addEventListener("prediction_segments", (event) => {
+      if (!cancelled) {
+        applySegmentsText(JSON.parse(event.data));
+      }
+    });
+    events.addEventListener("result", (event) => {
+      if (!cancelled) {
+        applyResultText(JSON.parse(event.data));
+      }
+    });
+    events.onerror = () => {
+      if (!cancelled) {
+        setSequenceStatus("sse reconnecting");
+      }
+    };
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      events.close();
     };
   }, [playMode]);
 
@@ -744,7 +805,8 @@ function App() {
     ["status", sequenceStatus],
     ["state", sequenceResult?.state ?? "-"],
     ["success", sequenceResult ? String(Boolean(sequenceResult.success)) : "-"],
-    ["keyframes", sequenceResult?.keyframes_seen ?? keyframes.length],
+    ["anchors", sequenceResult?.anchors_seen ?? keyframes.length],
+    ["samples", sampleKeyframes.length],
     ["segments", sequenceResult?.segments_written ?? predictionSegments.length],
     ["bootstrap", sequenceResult?.bootstrap_segments ?? "-"],
     ["confirmed", sequenceResult?.confirmed_segments ?? "-"],
@@ -797,7 +859,7 @@ function App() {
           </div>
 
           <div className="source-strip">
-            <span>{KEYFRAME_URL}</span>
+            <span>{RUNTIME_ANCHORS_URL}</span>
             <span>{sequenceMode ? SEGMENTS_URL : POLICY_URL}</span>
           </div>
 
@@ -807,7 +869,7 @@ function App() {
                 Prediction
               </button>
               <button type="button" className={playMode === "keyframes" ? "active" : ""} onClick={() => setPlayMode("keyframes")}>
-                Keyframes
+                Anchors
               </button>
             </div>
             <div className="keyframe-picker">
@@ -830,7 +892,7 @@ function App() {
           <div className="script-panels">
             <div className="script-panel">
               <div className="timeline-head">
-                <span>keyframe script</span>
+                <span>runtime io anchors</span>
                 <strong>
                   {activeKeyframeIndex + 1}/{keyframes.length}
                 </strong>
@@ -898,6 +960,24 @@ function App() {
               <div className="window-range">
                 segment {predictionSegments.length ? activeSegmentIndex + 1 : 0}/{predictionSegments.length}: {activeSegment?.segmentType ?? "-"} {activeSegment?.from.frame_id ?? "-"} - {activeSegment?.to.frame_id ?? "-"}
               </div>
+            </div>
+            <div className="script-panel">
+              <div className="timeline-head">
+                <span>reference samples</span>
+                <strong>{sampleKeyframes.length}</strong>
+              </div>
+              <div className="script-window keyframe-window">
+                {sampleKeyframes.slice(0, 48).map((item, index) => (
+                  <div className="keyframe-script-group" key={`${item.frame_id}-${index}`}>
+                    <div className="keyframe sample-keyframe">
+                      <span>{item.t_ms}</span>
+                      <strong>{item.frame_id}</strong>
+                      <em>{item.grip.toFixed(2)}</em>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="window-range">training/reference only; runtime prediction uses anchors</div>
             </div>
           </div>
 

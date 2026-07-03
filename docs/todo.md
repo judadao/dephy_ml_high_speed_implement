@@ -53,3 +53,13 @@ All initial TODO items are implemented as first-pass, tested building blocks.
 - [x] Add sibling io-device simulator bridge script.
 - [x] Update web to play growing JSONL segments without resetting playback.
 - [x] Show realtime result counters in the web panel.
+- [x] Replace web demo timer polling with Vite Server-Sent Events.
+- [x] Add cross-repo realtime hand e2e check with `linux_io_device_simul`.
+- [x] Separate sample/reference keyframes from runtime IO anchors.
+- [x] Add runtime IO generator and IO-to-anchor adapter.
+- [x] Make realtime watcher consume `--anchors` as the official runtime input.
+- [x] Split web demo into runtime anchors, current prediction, and reference samples.
+
+## Pending Model Discussion
+
+- [ ] Replace the lightweight bootstrap prior with a fuller learned model.

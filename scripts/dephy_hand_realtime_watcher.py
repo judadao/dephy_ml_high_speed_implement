@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Watch an appended hand keyframe CSV and emit realtime prediction segments."""
+"""Watch appended runtime anchors and emit realtime prediction segments."""
 
 from __future__ import annotations
 
 import argparse
 import csv
 import json
+import os
 import time
 from json import JSONDecodeError
 from pathlib import Path
@@ -48,6 +49,38 @@ def load_keyframes(path: Path) -> list[dict]:
         return rows
 
 
+def load_anchors(path: Path) -> list[dict]:
+    if not path.exists() or path.stat().st_size == 0:
+        return []
+    text = path.read_text()
+    if not text.strip():
+        return []
+    lines = text.splitlines()
+    if text and not text.endswith(("\n", "\r")) and len(lines) > 1:
+        lines = lines[:-1]
+    rows = []
+    for line in lines:
+        if not line.strip():
+            continue
+        try:
+            anchor = json.loads(line)
+            pose = anchor["observed_pose"]
+            rows.append(
+                {
+                    "frame_id": anchor["anchor_id"],
+                    "anchor_id": anchor["anchor_id"],
+                    "t_ms": int(anchor["t_ms"]),
+                    "pose": [float(pose[field]) for field in FIELDS],
+                    "source": anchor.get("source", "runtime_anchor"),
+                    "confidence": float(anchor.get("confidence", 0.85)),
+                    "anchor": anchor,
+                }
+            )
+        except (JSONDecodeError, KeyError, TypeError, ValueError):
+            continue
+    return rows
+
+
 class lines_to_reader:
     def __init__(self, lines: list[str]):
         self.lines = lines
@@ -64,6 +97,17 @@ def pose_to_keyframe(frame_id: str, t_ms: int, pose: list[float]) -> dict:
         "frame_id": frame_id,
         "t_ms": int(t_ms),
         "pose": pose[:],
+    }
+
+
+def endpoint_anchor(item: dict, target_kind: str) -> dict:
+    return {
+        "anchor_id": item.get("anchor_id", item["frame_id"]),
+        "frame_id": item["frame_id"],
+        "t_ms": item["t_ms"],
+        "source": item.get("source", "runtime_anchor"),
+        "target_kind": target_kind,
+        "confidence": item.get("confidence", 0.85),
     }
 
 
@@ -135,6 +179,10 @@ def make_segment(
         "source": source,
         "from": {"frame_id": start["frame_id"], "t_ms": start["t_ms"]},
         "to": {"frame_id": target["frame_id"], "t_ms": target["t_ms"]},
+        "from_anchor": endpoint_anchor(start, "observed_anchor"),
+        "to_anchor": endpoint_anchor(target, "predicted_anchor" if is_predicted_target else "observed_anchor"),
+        "anchor_source": start.get("source", source),
+        "target_kind": "predicted_anchor" if is_predicted_target else "observed_anchor",
         "start_t_ms": start["t_ms"],
         "target_t_ms": target["t_ms"],
         "frames_between_keyframes": frames_between,
@@ -155,7 +203,7 @@ def write_segment(path: Path, segment: dict) -> None:
 
 def write_result(path: Path, result: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp = path.with_suffix(path.suffix + f".{os.getpid()}.tmp")
     tmp.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
     tmp.replace(path)
 
@@ -250,6 +298,7 @@ def update_result(
             "mode": "realtime",
             "model": model.get("format"),
             "keyframes_seen": keyframes_seen,
+            "anchors_seen": keyframes_seen,
             "segments_written": len(segments),
             "bootstrap_segments": counts.get("bootstrap", 0),
             "confirmed_segments": counts.get("confirmed", 0),
@@ -270,7 +319,9 @@ def update_result(
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--keyframes", required=True)
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument("--anchors", help="runtime anchor JSONL input")
+    input_group.add_argument("--keyframes", help="compatibility CSV input; prefer --anchors for runtime")
     parser.add_argument("--model", required=True)
     parser.add_argument("--out", required=True)
     parser.add_argument("--result", required=True)
@@ -287,7 +338,7 @@ def main() -> int:
     args = parser.parse_args()
 
     model = load_model(Path(args.model))
-    keyframe_path = Path(args.keyframes)
+    input_path = Path(args.anchors or args.keyframes)
     out_path = Path(args.out)
     result_path = Path(args.result)
     if args.truncate and args.resume:
@@ -306,7 +357,7 @@ def main() -> int:
     last_activity = time.monotonic()
 
     while True:
-        keyframes = load_keyframes(keyframe_path)
+        keyframes = load_anchors(input_path) if args.anchors else load_keyframes(input_path)
         if len(keyframes) != last_seen_count:
             last_seen_count = len(keyframes)
             last_activity = time.monotonic()

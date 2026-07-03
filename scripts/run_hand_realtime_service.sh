@@ -2,7 +2,7 @@
 set -eu
 
 outdir="${OUTDIR:-build_out}/runtime"
-keyframes="${KEYFRAMES:-web/public/demo/hand_keyframes.csv}"
+anchors="${RUNTIME_ANCHORS:-web/public/demo/runtime_anchors.jsonl}"
 segments="${SEGMENTS:-web/public/demo/hand_sequence/prediction_segments.jsonl}"
 result="${RESULT:-web/public/demo/hand_sequence/result.json}"
 model="${MODEL:-build_out/hand_sequence/model.json}"
@@ -23,7 +23,7 @@ while :; do
     {
         printf '[%s] starting realtime watcher\n' "$(date -Is)"
         python3 scripts/dephy_hand_realtime_watcher.py \
-            --keyframes "$keyframes" \
+            --anchors "$anchors" \
             --model "$model" \
             --out "$segments" \
             --result "$result" \

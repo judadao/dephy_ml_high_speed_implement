@@ -12,7 +12,7 @@ KEYFRAME_MODE ?= grasp_can
 LIB := $(OUTDIR)/libdephy_ml_high_speed_implement.a
 OBJS := $(OUTDIR)/src/bitmap_anim.o $(OUTDIR)/src/joint_predictor.o $(OUTDIR)/src/hand_predictor.o
 
-.PHONY: all structure-audit direct-test test hand-rl-check hand-sequence-check hand-realtime-check bootstrap-prior-check io-device-pipeline-check zephyr-metadata demo web-demo-data web-realtime-demo-data web-realtime-service web-sequence-demo-loop web-install web-build web web-render-check clean
+.PHONY: all structure-audit direct-test test hand-rl-check hand-sequence-check hand-realtime-check runtime-anchor-check bootstrap-prior-check io-device-pipeline-check io-device-realtime-hand-check zephyr-metadata demo web-demo-data web-realtime-demo-data web-realtime-service web-sequence-demo-loop web-install web-build web web-render-check web-sse-check clean
 
 all: $(LIB) $(OUTDIR)/dephy_bitmap_anim $(OUTDIR)/dephy_joint_replay $(OUTDIR)/dephy_hand_predict
 
@@ -76,6 +76,9 @@ hand-realtime-check:
 	OUTDIR=$(OUTDIR) sh scripts/test_hand_realtime_watcher.sh
 	python3 scripts/test_realtime_schemas.py
 
+runtime-anchor-check:
+	OUTDIR=$(OUTDIR) sh scripts/test_runtime_anchor_flow.sh
+
 bootstrap-prior-check:
 	OUTDIR=$(OUTDIR) sh scripts/test_bootstrap_prior.sh
 
@@ -85,6 +88,9 @@ web-sequence-demo-loop:
 io-device-pipeline-check: $(OUTDIR)/dephy_joint_replay
 	OUTDIR=$(OUTDIR) sh scripts/test_io_device_pipeline.sh
 
+io-device-realtime-hand-check:
+	OUTDIR=$(OUTDIR) sh scripts/test_io_device_realtime_hand_e2e.sh
+
 demo: $(OUTDIR)/dephy_bitmap_anim
 	$(OUTDIR)/dephy_bitmap_anim --out $(OUTDIR)/demo_frames --frames 16 --width 128 --height 96 --cycles 1
 
@@ -92,20 +98,19 @@ web-install:
 	npm --prefix web install
 
 web-demo-data:
-	mkdir -p web/public/demo
+	mkdir -p web/public/demo web/public/demo/hand_sequence
 	cp examples/hand/hand_policy.json web/public/demo/hand_policy.json
-	mkdir -p web/public/demo/hand_sequence
 	if [ ! -f $(OUTDIR)/hand_sequence/model.json ]; then OUTDIR=$(OUTDIR) sh scripts/test_hand_sequence_model.sh >/dev/null; fi
-	python3 scripts/generate_random_hand_keyframes.py --out web/public/demo/hand_keyframes.csv --count $(KEYFRAME_COUNT) --sample-ms 300 --seed $(WEB_SEED) --noise-scale $(NOISE_SCALE) --mode $(KEYFRAME_MODE)
-	node scripts/validate_hand_keyframe_clearance.mjs --keyframes web/public/demo/hand_keyframes.csv --min-clearance 0
-	python3 scripts/dephy_hand_sequence_segments.py --keyframes web/public/demo/hand_keyframes.csv --model $(OUTDIR)/hand_sequence/model.json --out web/public/demo/hand_sequence/prediction_segments.jsonl --result web/public/demo/hand_sequence/result.json --render-ms 16 --frames $(FRAMES)
+	OUTDIR=$(OUTDIR) KEYFRAME_COUNT=$(KEYFRAME_COUNT) SAMPLE_MS=300 WEB_SEED=$(WEB_SEED) NOISE_SCALE=$(NOISE_SCALE) KEYFRAME_MODE=$(KEYFRAME_MODE) FRAMES=$(FRAMES) sh scripts/run_hand_runtime_anchor_demo.sh
+	cp web/public/demo/sample_keyframes.csv web/public/demo/hand_keyframes.csv
+	node scripts/validate_hand_keyframe_clearance.mjs --keyframes web/public/demo/sample_keyframes.csv --min-clearance 0
 
 web-realtime-demo-data:
 	mkdir -p web/public/demo web/public/demo/hand_sequence
 	cp examples/hand/hand_policy.json web/public/demo/hand_policy.json
 	if [ ! -f $(OUTDIR)/hand_sequence/model.json ]; then OUTDIR=$(OUTDIR) sh scripts/test_hand_sequence_model.sh >/dev/null; fi
-	KEYFRAME_COUNT=$(KEYFRAME_COUNT) SAMPLE_MS=300 WEB_SEED=$(WEB_SEED) NOISE_SCALE=$(NOISE_SCALE) KEYFRAME_MODE=$(KEYFRAME_MODE) LOOP=1 OUTDIR=$(OUTDIR) sh scripts/run_hand_realtime_keyframe_simul.sh web/public/demo/hand_keyframes.csv &
-	python3 scripts/dephy_hand_realtime_watcher.py --keyframes web/public/demo/hand_keyframes.csv --model $(OUTDIR)/hand_sequence/model.json --out web/public/demo/hand_sequence/prediction_segments.jsonl --result web/public/demo/hand_sequence/result.json --render-ms 16 --sample-ms 300 --frames $(FRAMES) --max-keyframes $(KEYFRAME_COUNT) --truncate
+	OUTDIR=$(OUTDIR) KEYFRAME_COUNT=$(KEYFRAME_COUNT) SAMPLE_MS=300 WEB_SEED=$(WEB_SEED) NOISE_SCALE=$(NOISE_SCALE) KEYFRAME_MODE=$(KEYFRAME_MODE) FRAMES=$(FRAMES) sh scripts/run_hand_runtime_anchor_demo.sh
+	cp web/public/demo/sample_keyframes.csv web/public/demo/hand_keyframes.csv
 
 web-realtime-service:
 	OUTDIR=$(OUTDIR) FRAMES=$(FRAMES) sh scripts/run_hand_realtime_service.sh
@@ -118,6 +123,9 @@ web: web-demo-data
 
 web-render-check: web-demo-data
 	OUTDIR=$(OUTDIR) ./scripts/test_web_render.sh
+
+web-sse-check: web-demo-data
+	OUTDIR=$(OUTDIR) ./scripts/test_web_sse.sh
 
 clean:
 	rm -rf $(OUTDIR)

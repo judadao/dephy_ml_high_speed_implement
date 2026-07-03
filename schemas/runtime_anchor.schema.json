@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dephy.local/schemas/runtime_anchor.schema.json",
+  "title": "Dephy Runtime IO Anchor",
+  "type": "object",
+  "required": ["format", "anchor_id", "t_ms", "source", "observed_pose", "confidence"],
+  "properties": {
+    "format": { "const": "dephy_runtime_anchor_v1" },
+    "anchor_id": { "type": "string" },
+    "t_ms": { "type": "integer", "minimum": 0 },
+    "source": { "type": "string" },
+    "io": {
+      "type": "object",
+      "properties": {
+        "slot": { "type": "integer", "minimum": 1 },
+        "type": { "type": "string" },
+        "channel": { "type": "integer", "minimum": 1 },
+        "value": { "type": "number" }
+      }
+    },
+    "observed_pose": {
+      "type": "object",
+      "required": ["x", "y", "z", "yaw", "pitch", "roll", "grip"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" },
+        "yaw": { "type": "number" },
+        "pitch": { "type": "number" },
+        "roll": { "type": "number" },
+        "grip": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "jitter": { "type": "number", "minimum": 0 },
+    "raw": { "type": "object" }
+  }
+}
