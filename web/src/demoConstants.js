@@ -42,6 +42,6 @@ export const TAB_CONTRACTS = [
   {
     mode: PLAY_MODES.ANCHORS,
     label: "Anchors",
-    contract: "runtime IO keyframe list only",
+    contract: "complete sample keyframe script playback",
   },
 ];

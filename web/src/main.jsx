@@ -11,14 +11,13 @@ import { activeFrameIndexForSegment, activeSegmentIndexForFrame, currentRuntimeA
 import { ANCHOR_MS, DEFAULT_POLICY, DEMO_RECORD_LIMIT, KEYFRAME_URL, PLAY_MODES, POLICY_URL, PREDICTION_WINDOW_AFTER, PREDICTION_WINDOW_BEFORE, RENDER_MS, RESULT_URL, RUNTIME_ANCHORS_URL, SAMPLE_KEYFRAME_URL, SEGMENTS_URL, TAB_CONTRACTS, UI_UPDATE_MS, VISIBLE_ROW_LIMIT } from "./demoConstants.js";
 import { flattenPredictionSegments, formatPredictionCsvRow, frameFromKeyframe, makeFrameState, parseCsv, parsePredictionSegmentsJsonl, parseRuntimeAnchorsJsonl } from "./demoData.js";
 import { anchorFrameAt, predictionFrameForAnchor } from "./manualPlayback.js";
-import { clampKeyframeIndex, keyframesForMode, nextSegmentPlayback, shouldRunPlayback, startPlaybackState } from "./playbackController.js";
+import { clampKeyframeIndex, keyframesForMode, nextAnchorPlayback, nextSegmentPlayback, shouldRunPlayback, startPlaybackState } from "./playbackController.js";
 import { connectDemoEvents, fetchInitialDemoData } from "./demoTransport.js";
 import "./styles.css";
 
 function App() {
   const [sampleKeyframes, setSampleKeyframes] = useState([]);
   const [runtimeAnchors, setRuntimeAnchors] = useState([]);
-  const [anchorReviewKeyframes, setAnchorReviewKeyframes] = useState([]);
   const [policy, setPolicy] = useState(DEFAULT_POLICY);
   const [sequenceSegments, setSequenceSegments] = useState([]);
   const [sequenceFrames, setSequenceFrames] = useState([]);
@@ -47,7 +46,7 @@ function App() {
   const playbackReady = Boolean(frame);
 
   const keyframes = runtimeAnchors;
-  const reviewKeyframes = keyframesForMode({ playMode, liveKeyframes: keyframes, anchorReviewKeyframes });
+  const reviewKeyframes = keyframesForMode({ playMode, liveKeyframes: keyframes, sampleKeyframes });
 
   useEffect(() => {
     keyframesRef.current = keyframes;
@@ -230,8 +229,26 @@ function App() {
       return undefined;
     }
     const timer = window.setInterval(() => {
-      const liveKeyframes = keyframesRef.current;
-      if (liveKeyframes.length === 0) {
+      const sourceKeyframes = playMode === PLAY_MODES.ANCHORS ? reviewKeyframes : keyframesRef.current;
+      if (sourceKeyframes.length === 0) {
+        return;
+      }
+      if (playMode === PLAY_MODES.ANCHORS) {
+        const now = performance.now();
+        const advanced = nextAnchorPlayback({
+          keyframes: sourceKeyframes,
+          currentIndex: anchorPlaybackRef.current.index,
+          now,
+          lastTick: anchorPlaybackRef.current.lastTick,
+          sampleMs: ANCHOR_MS,
+        });
+        if (!advanced) {
+          return;
+        }
+        anchorPlaybackRef.current = { index: advanced.index, lastTick: advanced.lastTick };
+        setSelectedKeyframeIndex(advanced.index);
+        frameRef.current = frameFromKeyframe(advanced.keyframe, advanced.index);
+        setFrame(frameRef.current);
         return;
       }
       const segments = predictionSegmentsRef.current;
@@ -280,6 +297,9 @@ function App() {
     const segment = segments[playback.segmentIndex] || segments[0];
     const next = startPlaybackState({ playMode, playback, segment, segmentCount: segments.length, now });
     segmentPlaybackRef.current = next.playback;
+    if (playMode === PLAY_MODES.ANCHORS) {
+      anchorPlaybackRef.current = { index: clampKeyframeIndex(selectedKeyframeIndex, reviewKeyframes), lastTick: 0 };
+    }
     setRunning(next.running);
     if (!next.running) {
       return;
@@ -345,11 +365,9 @@ function App() {
   function switchPlaybackMode(mode) {
     if (mode === PLAY_MODES.ANCHORS) {
       setRunning(false);
-      const snapshot = keyframes.slice();
-      const reviewIndex = clampKeyframeIndex(selectedKeyframeIndex, snapshot);
-      setAnchorReviewKeyframes(snapshot);
+      const reviewIndex = clampKeyframeIndex(selectedKeyframeIndex, sampleKeyframes);
       setSelectedKeyframeIndex(reviewIndex);
-      const manualFrame = anchorFrameAt(snapshot, reviewIndex);
+      const manualFrame = anchorFrameAt(sampleKeyframes, reviewIndex);
       if (manualFrame) {
         anchorPlaybackRef.current = { index: reviewIndex, lastTick: 0 };
         frameRef.current = manualFrame;
@@ -567,10 +585,8 @@ function App() {
               activeKeyframeRowRef={activeKeyframeRowRef}
               keyframeScrollRef={keyframeScrollRef}
               keyframes={reviewKeyframes}
-              sampleKeyframes={sampleKeyframes}
               showKeyframe={showKeyframe}
-              visibleRuntimeAnchors={visibleRuntimeAnchors}
-              visibleRowLimit={VISIBLE_ROW_LIMIT}
+              visibleKeyframes={reviewKeyframes}
             />
           )}
 

@@ -3,6 +3,7 @@ import {
   clampKeyframeIndex,
   isManualReviewMode,
   keyframesForMode,
+  nextAnchorPlayback,
   nextSegmentPlayback,
   playButtonState,
   shouldRunPlayback,
@@ -24,25 +25,32 @@ const segment = {
 assert.equal(isManualReviewMode(PLAY_MODES.ANCHORS), true);
 assert.equal(isManualReviewMode(PLAY_MODES.REALTIME), false);
 
-assert.deepEqual(playButtonState({ playMode: PLAY_MODES.ANCHORS, running: true }), {
-  disabled: true,
-  label: "Manual",
-  title: "Anchors are manual review only",
-});
+assert.equal(playButtonState({ playMode: PLAY_MODES.ANCHORS, running: false }).label, "Play");
+assert.equal(playButtonState({ playMode: PLAY_MODES.ANCHORS, running: true }).label, "Pause");
 assert.equal(playButtonState({ playMode: PLAY_MODES.REALTIME, running: false }).label, "Play");
 assert.equal(playButtonState({ playMode: PLAY_MODES.PREDICTION, running: true }).label, "Pause");
 
-assert.equal(shouldRunPlayback({ playMode: PLAY_MODES.ANCHORS, running: true, playbackReady: true }), false);
+assert.equal(shouldRunPlayback({ playMode: PLAY_MODES.ANCHORS, running: true, playbackReady: true }), true);
 assert.equal(shouldRunPlayback({ playMode: PLAY_MODES.REALTIME, running: true, playbackReady: true }), true);
 assert.equal(shouldRunPlayback({ playMode: PLAY_MODES.PREDICTION, running: true, playbackReady: true }), true);
 
 const liveKeyframes = [{ frame_id: "live_1" }, { frame_id: "live_2" }];
-const reviewKeyframes = [{ frame_id: "review_1" }];
-assert.equal(keyframesForMode({ playMode: PLAY_MODES.ANCHORS, liveKeyframes, anchorReviewKeyframes: reviewKeyframes })[0].frame_id, "review_1");
-assert.equal(keyframesForMode({ playMode: PLAY_MODES.REALTIME, liveKeyframes, anchorReviewKeyframes: reviewKeyframes })[0].frame_id, "live_1");
-assert.equal(clampKeyframeIndex(99, reviewKeyframes), 0);
+const sampleKeyframes = [{ frame_id: "sample_1" }];
+assert.equal(keyframesForMode({ playMode: PLAY_MODES.ANCHORS, liveKeyframes, sampleKeyframes })[0].frame_id, "sample_1");
+assert.equal(keyframesForMode({ playMode: PLAY_MODES.REALTIME, liveKeyframes, sampleKeyframes })[0].frame_id, "live_1");
+assert.equal(clampKeyframeIndex(99, sampleKeyframes), 0);
 assert.equal(clampKeyframeIndex(-2, liveKeyframes), 0);
 assert.equal(clampKeyframeIndex(1, liveKeyframes), 1);
+
+const anchorAdvance = nextAnchorPlayback({
+  keyframes: liveKeyframes,
+  currentIndex: 0,
+  now: 500,
+  lastTick: 0,
+  sampleMs: 500,
+});
+assert.equal(anchorAdvance.index, 1);
+assert.equal(anchorAdvance.keyframe.frame_id, "live_2");
 
 const anchorStart = startPlaybackState({
   playMode: PLAY_MODES.ANCHORS,
@@ -51,7 +59,7 @@ const anchorStart = startPlaybackState({
   segmentCount: 1,
   now: 1000,
 });
-assert.equal(anchorStart.running, false);
+assert.equal(anchorStart.running, true);
 assert.deepEqual(anchorStart.playback, { segmentIndex: 0, startTime: 0, lastFrameIndex: -1 });
 
 const realtimeStart = startPlaybackState({

@@ -6,13 +6,6 @@ export function isManualReviewMode(playMode) {
 }
 
 export function playButtonState({ playMode, running }) {
-  if (isManualReviewMode(playMode)) {
-    return {
-      disabled: true,
-      label: "Manual",
-      title: "Anchors are manual review only",
-    };
-  }
   return {
     disabled: false,
     label: running ? "Pause" : "Play",
@@ -21,12 +14,12 @@ export function playButtonState({ playMode, running }) {
 }
 
 export function shouldRunPlayback({ playMode, running, playbackReady }) {
-  return Boolean(running && playbackReady && !isManualReviewMode(playMode));
+  return Boolean(running && playbackReady);
 }
 
-export function keyframesForMode({ playMode, liveKeyframes, anchorReviewKeyframes }) {
-  if (isManualReviewMode(playMode) && anchorReviewKeyframes.length > 0) {
-    return anchorReviewKeyframes;
+export function keyframesForMode({ playMode, liveKeyframes, sampleKeyframes }) {
+  if (isManualReviewMode(playMode) && sampleKeyframes.length > 0) {
+    return sampleKeyframes;
   }
   return liveKeyframes;
 }
@@ -40,7 +33,7 @@ export function clampKeyframeIndex(index, keyframes) {
 
 export function startPlaybackState({ playMode, playback, segment, segmentCount, now }) {
   if (isManualReviewMode(playMode)) {
-    return { running: false, playback };
+    return { running: true, playback };
   }
   if (!segment || segmentCount === 0) {
     return { running: true, playback };
@@ -55,6 +48,18 @@ export function startPlaybackState({ playMode, playback, segment, segmentCount, 
   return {
     running: true,
     playback: { ...playback, startTime: now - pausedRatio * duration },
+  };
+}
+
+export function nextAnchorPlayback({ keyframes, currentIndex, now, lastTick, sampleMs }) {
+  if (keyframes.length === 0 || now - lastTick < sampleMs) {
+    return null;
+  }
+  const index = (currentIndex + 1) % keyframes.length;
+  return {
+    index,
+    lastTick: now,
+    keyframe: keyframes[index],
   };
 }
 

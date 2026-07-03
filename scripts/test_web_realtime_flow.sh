@@ -6,6 +6,7 @@ mkdir -p "$outdir"
 
 grep -Fq 'useState(PLAY_MODES.REALTIME)' web/src/main.jsx
 grep -Fq 'Realtime Demo' web/src/demoConstants.js
+grep -Fq 'complete sample keyframe script playback' web/src/demoConstants.js
 grep -Fq 'tabContracts.map' web/src/PlaybackToolbar.jsx
 grep -Fq 'current runtime IO keyframe + current prediction segment + current prediction row' web/src/demoConstants.js
 grep -Fq 'currentRuntimeAnchorIndexForDisplay({ realtimeMode' web/src/main.jsx
@@ -46,13 +47,18 @@ grep -Fq 'export function RealtimeDemoTab' web/src/RealtimeDemoTab.jsx
 grep -Fq 'export function DeviceIoPanel' web/src/DeviceIoPanel.jsx
 grep -Fq 'export function PredictionTab' web/src/PredictionTab.jsx
 grep -Fq 'export function AnchorsTab' web/src/AnchorsTab.jsx
+grep -Fq 'sample key frames' web/src/AnchorsTab.jsx
+grep -Fq 'complete sample_keyframes.csv playback source' web/src/AnchorsTab.jsx
 grep -Fq 'export function PlaybackToolbar' web/src/PlaybackToolbar.jsx
 grep -Fq 'export function MetricsPanels' web/src/MetricsPanels.jsx
 grep -Fq 'export function DemoHeader' web/src/DemoHeader.jsx
 grep -Fq 'playButtonState({ playMode, running })' web/src/DemoHeader.jsx
 grep -Fq 'shouldRunPlayback({ playMode, running, playbackReady })' web/src/main.jsx
-grep -Fq 'keyframesForMode({ playMode, liveKeyframes: keyframes, anchorReviewKeyframes })' web/src/main.jsx
-grep -Fq 'setAnchorReviewKeyframes(snapshot)' web/src/main.jsx
+grep -Fq 'keyframesForMode({ playMode, liveKeyframes: keyframes, sampleKeyframes })' web/src/main.jsx
+if rg -q 'setAnchorReviewKeyframes|anchorReviewKeyframes' web/src; then
+    echo "anchors tab should use complete sample keyframes, not runtime anchor snapshots" >&2
+    exit 1
+fi
 grep -Fq 'playMode === PLAY_MODES.ANCHORS ? reviewKeyframes : keyframes' web/src/main.jsx
 grep -Fq 'nextSegmentPlayback({ segments, playback: segmentPlaybackRef.current, now })' web/src/main.jsx
 grep -Fq 'startPlaybackState({ playMode' web/src/main.jsx
@@ -78,7 +84,7 @@ grep -Fq 'connectDemoEvents({' web/src/main.jsx
 grep -Fq 'if (!events) {' web/src/main.jsx
 grep -Fq 'switchPlaybackMode(tab.mode)' web/src/PlaybackToolbar.jsx
 grep -Fq 'anchorFrameAt(sourceKeyframes, index)' web/src/main.jsx
-grep -Fq 'anchorFrameAt(snapshot, reviewIndex)' web/src/main.jsx
+grep -Fq 'anchorFrameAt(sampleKeyframes, reviewIndex)' web/src/main.jsx
 grep -Fq 'anchorPlaybackRef' web/src/main.jsx
 grep -Fq 'keyframesRef.current' web/src/main.jsx
 grep -Fq 'sequenceResultRef.current' web/src/main.jsx
