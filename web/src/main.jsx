@@ -13,6 +13,7 @@ import { flattenPredictionSegments, formatPredictionCsvRow, frameFromKeyframe, m
 import { anchorFrameAt, predictionFrameForAnchor } from "./manualPlayback.js";
 import { clampKeyframeIndex, keyframesForMode, nextAnchorPlayback, nextSegmentPlayback, shouldRunPlayback, startPlaybackState } from "./playbackController.js";
 import { connectDemoEvents, fetchInitialDemoData } from "./demoTransport.js";
+import { buildSamplePredictionSegments } from "./samplePredictionSegments.js";
 import "./styles.css";
 
 function App() {
@@ -47,6 +48,11 @@ function App() {
 
   const keyframes = runtimeAnchors;
   const reviewKeyframes = keyframesForMode({ playMode, liveKeyframes: keyframes, sampleKeyframes });
+  const predictionMode = playMode === PLAY_MODES.PREDICTION;
+  const realtimeMode = playMode === PLAY_MODES.REALTIME;
+  const samplePredictionSegments = useMemo(() => buildSamplePredictionSegments(sampleKeyframes, 100), [sampleKeyframes]);
+  const displaySegments = predictionMode ? samplePredictionSegments : sequenceSegments;
+  const displayFrames = useMemo(() => flattenPredictionSegments(displaySegments), [displaySegments]);
 
   useEffect(() => {
     keyframesRef.current = keyframes;
@@ -279,7 +285,7 @@ function App() {
   }, [playMode]);
 
   function resetDemo() {
-    const sourceKeyframes = playMode === PLAY_MODES.ANCHORS ? reviewKeyframes : keyframes;
+    const sourceKeyframes = playMode === PLAY_MODES.ANCHORS || predictionMode ? reviewKeyframes : keyframes;
     if (sourceKeyframes.length === 0) {
       return;
     }
@@ -345,7 +351,7 @@ function App() {
   }
 
   function showKeyframe(index) {
-    const sourceKeyframes = playMode === PLAY_MODES.ANCHORS ? reviewKeyframes : keyframes;
+    const sourceKeyframes = playMode === PLAY_MODES.ANCHORS || predictionMode ? reviewKeyframes : keyframes;
     if (!sourceKeyframes[index]) {
       return;
     }
@@ -378,9 +384,8 @@ function App() {
     setPlayMode(mode);
   }
 
-  const realtimeMode = playMode === PLAY_MODES.REALTIME;
   const sequenceMode = playMode !== PLAY_MODES.ANCHORS;
-  const predictionSegments = sequenceSegments;
+  const predictionSegments = displaySegments;
 
   useEffect(() => {
     const playableSegments = predictionSegments.filter((segment) => segment.frames.length > 0);
@@ -394,7 +399,7 @@ function App() {
     if (playableSegments.length === 0) {
       return;
     }
-    if (sequenceMode && running && latestKey && latestKey !== previousLatestKey) {
+    if (realtimeMode && running && latestKey && latestKey !== previousLatestKey) {
       const latestIndex = playableSegments.length - 1;
       segmentPlaybackRef.current = { segmentIndex: latestIndex, startTime: performance.now(), lastFrameIndex: -1 };
       setExpandedSegments({ [playableSegments[latestIndex].key]: true });
@@ -445,7 +450,7 @@ function App() {
       const targetTop = scroller.scrollTop + rowCenterInScroller - scroller.clientHeight / 2;
       scroller.scrollTop = Math.max(0, Math.min(targetTop, scroller.scrollHeight - scroller.clientHeight));
     }
-  }, [activeKeyframeIndex, playMode, expandedSegments, sequenceFrames.length]);
+  }, [activeKeyframeIndex, playMode, expandedSegments, displayFrames.length]);
 
   if (!frame || keyframes.length === 0) {
     return (
@@ -465,7 +470,7 @@ function App() {
     ? { frame_id: frame.target_frame || "sequence", grip: frame.grip, tolerance: 0.001 }
     : reviewKeyframes[frame.targetIndex] || reviewKeyframes[0] || keyframes[0];
   const predictedGap = Math.floor(ANCHOR_MS / RENDER_MS);
-  const sequenceCsvRows = ["frame_t_ms,target_frame,palm_x,palm_y,palm_z,yaw,pitch,roll,grip"].concat(sequenceFrames.map(formatPredictionCsvRow));
+  const sequenceCsvRows = ["frame_t_ms,target_frame,palm_x,palm_y,palm_z,yaw,pitch,roll,grip"].concat(displayFrames.map(formatPredictionCsvRow));
   const liveRows = [
     ["frame_t_ms", Number(frame.frame_t_ms).toFixed(3).replace(/\.000$/, "")],
     ["target", target.frame_id],
@@ -484,13 +489,13 @@ function App() {
   ];
   const policyRows = [
     ["source", sequenceMode ? "implement segments" : "keyframe script"],
-    ["frames", sequenceMode ? sequenceFrames.length : keyframes.length],
+    ["frames", sequenceMode ? displayFrames.length : keyframes.length],
     ["status", sequenceStatus],
     ["state", sequenceResult?.state ?? "-"],
     ["success", sequenceResult ? String(Boolean(sequenceResult.success)) : "-"],
     ["anchors", sequenceResult?.anchors_seen ?? keyframes.length],
     ["samples", sampleKeyframes.length],
-    ["segments", sequenceResult?.segments_written ?? predictionSegments.length],
+    ["segments", predictionSegments.length],
     ["bootstrap", sequenceResult?.bootstrap_segments ?? "-"],
     ["confirmed", sequenceResult?.confirmed_segments ?? "-"],
     ["correction", sequenceResult?.correction_segments ?? "-"],
@@ -523,7 +528,7 @@ function App() {
         <aside className="control-panel">
           <PlaybackToolbar
             anchorMs={ANCHOR_MS}
-            keyframes={playMode === PLAY_MODES.ANCHORS ? reviewKeyframes : keyframes}
+            keyframes={playMode === PLAY_MODES.ANCHORS || predictionMode ? reviewKeyframes : keyframes}
             onSelectKeyframe={showKeyframe}
             playMode={playMode}
             policyUrl={POLICY_URL}
@@ -533,7 +538,7 @@ function App() {
             runtimeAnchorsUrl={RUNTIME_ANCHORS_URL}
             segmentUrl={SEGMENTS_URL}
             selectedKeyframeIndex={selectedKeyframeIndex}
-            sequenceFrames={sequenceFrames}
+            sequenceFrames={displayFrames}
             sequenceMode={sequenceMode}
             switchPlaybackMode={switchPlaybackMode}
             tabContracts={TAB_CONTRACTS}

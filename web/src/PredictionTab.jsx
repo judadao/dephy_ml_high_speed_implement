@@ -154,7 +154,7 @@ function ReferenceSamplesPanel({ sampleKeyframes, visibleRowLimit }) {
           </div>
         ))}
       </div>
-      <div className="window-range">training/reference only; runtime prediction uses anchors</div>
+      <div className="window-range">sample_keyframes.csv reference; prediction rows are sample-derived in this tab</div>
     </div>
   );
 }

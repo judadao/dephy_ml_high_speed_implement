@@ -5,6 +5,10 @@ export function isManualReviewMode(playMode) {
   return playMode === PLAY_MODES.ANCHORS;
 }
 
+export function usesSampleKeyframesMode(playMode) {
+  return playMode === PLAY_MODES.PREDICTION || playMode === PLAY_MODES.ANCHORS;
+}
+
 export function playButtonState({ playMode, running }) {
   return {
     disabled: false,
@@ -18,7 +22,7 @@ export function shouldRunPlayback({ playMode, running, playbackReady }) {
 }
 
 export function keyframesForMode({ playMode, liveKeyframes, sampleKeyframes }) {
-  if (isManualReviewMode(playMode) && sampleKeyframes.length > 0) {
+  if (usesSampleKeyframesMode(playMode) && sampleKeyframes.length > 0) {
     return sampleKeyframes;
   }
   return liveKeyframes;

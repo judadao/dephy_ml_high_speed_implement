@@ -6,6 +6,7 @@ mkdir -p "$outdir"
 
 grep -Fq 'useState(PLAY_MODES.REALTIME)' web/src/main.jsx
 grep -Fq 'Realtime Demo' web/src/demoConstants.js
+grep -Fq 'sample keyframe prediction segment list and segment rows' web/src/demoConstants.js
 grep -Fq 'complete sample keyframe script playback' web/src/demoConstants.js
 grep -Fq 'tabContracts.map' web/src/PlaybackToolbar.jsx
 grep -Fq 'current runtime IO keyframe + current prediction segment + current prediction row' web/src/demoConstants.js
@@ -18,6 +19,7 @@ grep -Fq 'prediction for current keyframe' web/src/RealtimeDemoTab.jsx
 grep -Fq 'current prediction rows' web/src/RealtimeDemoTab.jsx
 grep -Fq 'predictionLag' web/src/main.jsx
 grep -Fq 'segment.to.frame_id === item.frame_id' web/src/PredictionTab.jsx
+grep -Fq 'if (realtimeMode && running && latestKey && latestKey !== previousLatestKey)' web/src/main.jsx
 grep -Fq 'segmentPlaybackRef.current = { segmentIndex: latestIndex' web/src/main.jsx
 grep -Fq 'VISIBLE_ROW_LIMIT = 15' web/src/demoConstants.js
 grep -Fq 'DEMO_RECORD_LIMIT = 15' web/src/demoConstants.js
@@ -43,6 +45,7 @@ grep -Fq 'latestPlayableSegmentKeyRef' web/src/main.jsx
 grep -Fq 'latestKey !== previousLatestKey' web/src/main.jsx
 grep -Fq 'formatPredictionCsvRow(prediction)' web/src/RealtimeDemoTab.jsx
 grep -Fq 'formatPredictionCsvRow(prediction)' web/src/PredictionTab.jsx
+grep -Fq 'sample_keyframes.csv reference; prediction rows are sample-derived in this tab' web/src/PredictionTab.jsx
 grep -Fq 'export function RealtimeDemoTab' web/src/RealtimeDemoTab.jsx
 grep -Fq 'export function DeviceIoPanel' web/src/DeviceIoPanel.jsx
 grep -Fq 'export function PredictionTab' web/src/PredictionTab.jsx
@@ -57,11 +60,14 @@ grep -Fq 'playButtonState({ playMode, running })' web/src/DemoHeader.jsx
 grep -Fq 'shouldRunPlayback({ playMode, running, playbackReady })' web/src/main.jsx
 grep -Fq 'keyframesForMode({ playMode, liveKeyframes: keyframes, sampleKeyframes })' web/src/main.jsx
 grep -Fq 'const sourceKeyframes = reviewKeyframes' web/src/main.jsx
+grep -Fq 'buildSamplePredictionSegments(sampleKeyframes, 100)' web/src/main.jsx
+grep -Fq 'const displaySegments = predictionMode ? samplePredictionSegments : sequenceSegments' web/src/main.jsx
+grep -Fq 'playMode === PLAY_MODES.ANCHORS || predictionMode ? reviewKeyframes : keyframes' web/src/main.jsx
+grep -Fq 'usesSampleKeyframesMode(playMode)' web/src/playbackController.js
 if rg -q 'setAnchorReviewKeyframes|anchorReviewKeyframes' web/src; then
     echo "anchors tab should use complete sample keyframes, not runtime anchor snapshots" >&2
     exit 1
 fi
-grep -Fq 'playMode === PLAY_MODES.ANCHORS ? reviewKeyframes : keyframes' web/src/main.jsx
 grep -Fq 'nextSegmentPlayback({ segments, playback: segmentPlaybackRef.current, now })' web/src/main.jsx
 grep -Fq 'startPlaybackState({ playMode' web/src/main.jsx
 node scripts/test_web_playback_controller.mjs

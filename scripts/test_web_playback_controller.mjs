@@ -8,8 +8,10 @@ import {
   playButtonState,
   shouldRunPlayback,
   startPlaybackState,
+  usesSampleKeyframesMode,
 } from "../web/src/playbackController.js";
 import { PLAY_MODES } from "../web/src/demoConstants.js";
+import { buildSamplePredictionSegments } from "../web/src/samplePredictionSegments.js";
 
 const segment = {
   from: { t_ms: 0 },
@@ -24,6 +26,9 @@ const segment = {
 
 assert.equal(isManualReviewMode(PLAY_MODES.ANCHORS), true);
 assert.equal(isManualReviewMode(PLAY_MODES.REALTIME), false);
+assert.equal(usesSampleKeyframesMode(PLAY_MODES.PREDICTION), true);
+assert.equal(usesSampleKeyframesMode(PLAY_MODES.ANCHORS), true);
+assert.equal(usesSampleKeyframesMode(PLAY_MODES.REALTIME), false);
 
 assert.equal(playButtonState({ playMode: PLAY_MODES.ANCHORS, running: false }).label, "Play");
 assert.equal(playButtonState({ playMode: PLAY_MODES.ANCHORS, running: true }).label, "Pause");
@@ -37,6 +42,7 @@ assert.equal(shouldRunPlayback({ playMode: PLAY_MODES.PREDICTION, running: true,
 const liveKeyframes = [{ frame_id: "live_1" }, { frame_id: "live_2" }];
 const sampleKeyframes = [{ frame_id: "sample_1" }];
 assert.equal(keyframesForMode({ playMode: PLAY_MODES.ANCHORS, liveKeyframes, sampleKeyframes })[0].frame_id, "sample_1");
+assert.equal(keyframesForMode({ playMode: PLAY_MODES.PREDICTION, liveKeyframes, sampleKeyframes })[0].frame_id, "sample_1");
 assert.equal(keyframesForMode({ playMode: PLAY_MODES.REALTIME, liveKeyframes, sampleKeyframes })[0].frame_id, "live_1");
 assert.equal(clampKeyframeIndex(99, sampleKeyframes), 0);
 assert.equal(clampKeyframeIndex(-2, liveKeyframes), 0);
@@ -88,5 +94,19 @@ const endAdvance = nextSegmentPlayback({
 });
 assert.equal(endAdvance.status, "advanced");
 assert.equal(endAdvance.frame.csvLine, 13);
+
+const sampleSegments = buildSamplePredictionSegments(
+  [
+    { frame_id: "sample_open", t_ms: 0, x: 0, y: 0, z: 0, yaw: 0, pitch: 0, roll: 0, grip: 0 },
+    { frame_id: "sample_close", t_ms: 500, x: 1, y: 1, z: 1, yaw: 1, pitch: 1, roll: 1, grip: 1 },
+  ],
+  4
+);
+assert.equal(sampleSegments.length, 1);
+assert.equal(sampleSegments[0].source, "sample_keyframes");
+assert.equal(sampleSegments[0].fromAnchor.source, "sample_keyframes");
+assert.equal(sampleSegments[0].toAnchor.anchor_id, "sample_close");
+assert.equal(sampleSegments[0].frames.at(-1).target_frame, "sample_close");
+assert.equal(JSON.stringify(sampleSegments).includes("runtime_io"), false);
 
 console.log("web playback controller ok");

@@ -37,7 +37,7 @@ export const TAB_CONTRACTS = [
   {
     mode: PLAY_MODES.PREDICTION,
     label: "Prediction",
-    contract: "generated prediction segment list and segment rows",
+    contract: "sample keyframe prediction segment list and segment rows",
   },
   {
     mode: PLAY_MODES.ANCHORS,
