@@ -13,6 +13,7 @@ latency budget.
 - [ ] Define the generic IO sample schema for `DI`, `DO`, `AI`, `AO`, and `Relay`.
 - [ ] Define snapshot/key-state recording format and import/export flow.
 - [ ] Implement `cyclic_io_synthetic_v1` benchmark cases.
+- [ ] Generate positive, negative, and test datasets following `cyclic_io_dataset_design.md`.
 - [ ] Implement cycle phase normalization and cycle-period detection.
 - [ ] Build the few-shot fine-tune dataset format for positive periodic samples.
 - [ ] Add model training targets for phase, snapshot, trajectory, endpoint, smoothness, and noisy convergence losses.

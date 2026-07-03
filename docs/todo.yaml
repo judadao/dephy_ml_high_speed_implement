@@ -11,6 +11,9 @@ items:
   - id: cyclic_synthetic_v1
     title: Implement cyclic_io_synthetic_v1 benchmark cases
     status: pending
+  - id: cyclic_dataset_generation
+    title: Generate positive, negative, and test datasets following cyclic_io_dataset_design.md
+    status: pending
   - id: cyclic_phase_normalization
     title: Implement cycle phase normalization and period detection
     status: pending

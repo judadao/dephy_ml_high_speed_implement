@@ -14,6 +14,8 @@ The detailed direction is recorded in
 [`docs/cyclic_io_prediction_direction.md`](docs/cyclic_io_prediction_direction.md).
 Testing and model-training targets are recorded in
 [`docs/cyclic_io_test_strategy.md`](docs/cyclic_io_test_strategy.md).
+Positive, negative, and test dataset design is recorded in
+[`docs/cyclic_io_dataset_design.md`](docs/cyclic_io_dataset_design.md).
 
 The existing single-palm/hand workflow remains a demo and validation surface,
 not the final product scope. It is useful for visualizing low-rate anchors,
