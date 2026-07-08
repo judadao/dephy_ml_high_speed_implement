@@ -26,6 +26,7 @@ contracts:
 - [x] Define case metadata / IO map format.
 - [x] Define result / metrics output format.
 - [x] Define planned cyclic IO file and folder layout.
+- [x] Define model health display, score, gates, and regression check format.
 
 ## Cyclic IO Implementation TODO
 

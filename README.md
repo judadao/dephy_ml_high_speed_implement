@@ -22,6 +22,8 @@ Cycle boundary and phase rules are recorded in
 [`docs/cyclic_io_phase_rules.md`](docs/cyclic_io_phase_rules.md).
 Core dataset/model/runtime contract defaults are recorded in
 [`docs/cyclic_io_core_contracts.md`](docs/cyclic_io_core_contracts.md).
+Model health display and pass/fail gates are recorded in
+[`docs/cyclic_io_model_health.md`](docs/cyclic_io_model_health.md).
 
 The existing single-palm/hand workflow remains a demo and validation surface,
 not the final product scope. It is useful for visualizing low-rate anchors,
