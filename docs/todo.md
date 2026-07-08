@@ -27,8 +27,11 @@ contracts:
 - [x] Define result / metrics output format.
 - [x] Define planned cyclic IO file and folder layout.
 - [x] Define model health display, score, gates, and regression check format.
+- [x] Document no-ML known-target baseline interpretation and limits.
 
 ## Cyclic IO Implementation TODO
+
+- [ ] Add explicit model health CLI modes: known-target baseline, noisy runtime, negative rejection, and correction.
 
 - [x] Implement `cyclic_io_synthetic_v1` benchmark cases.
 - [x] Generate positive, negative, and test datasets following `cyclic_io_dataset_design.md`.

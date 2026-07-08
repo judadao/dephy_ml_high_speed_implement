@@ -41,6 +41,12 @@ items:
   - id: cyclic_model_health_contract
     title: Define model health display, score, gates, and regression check format
     status: done
+  - id: cyclic_no_ml_baseline_interpretation
+    title: Document no-ML known-target baseline interpretation and limits
+    status: done
+  - id: cyclic_model_health_modes
+    title: Add explicit model health CLI modes for known-target, noisy runtime, negative rejection, and correction
+    status: pending
   - id: cyclic_synthetic_v1
     title: Implement cyclic_io_synthetic_v1 benchmark cases
     status: done

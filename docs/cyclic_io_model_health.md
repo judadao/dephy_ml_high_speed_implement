@@ -142,3 +142,59 @@ with smooth output and low latency?
 ```
 
 If the answer is not clearly yes, model health should warn or fail.
+
+## No-ML Baseline Interpretation
+
+The current deterministic no-ML baseline uses known start and target snapshots
+and a smoothstep interpolation:
+
+```txt
+start_io_vector + target_io_vector
+  -> predict_transition()
+  -> 1000-frame normalized trajectory
+```
+
+This mode is expected to score very high, often 100%, because:
+
+```txt
+target snapshot is already known
+the final frame is constructed to equal the target vector
+phase/target selection is not meaningfully challenged
+synthetic happy-path cases are deterministic and clean
+```
+
+Therefore, a high no-ML known-target score means:
+
+```txt
+schema, vectorization, 1000-frame generation, endpoint contract, and latency are healthy
+```
+
+It does not mean:
+
+```txt
+the no-ML baseline can solve noisy runtime phase/target estimation
+the model is robust to missing channels
+negative rejection is good
+runtime re-anchor/correction is good
+real industrial IO behavior is solved
+```
+
+Future model-health modes should be split explicitly:
+
+```txt
+NO-ML BASELINE / known target:
+  Expected to be high. Verifies pipeline and endpoint contract.
+
+NO-ML RUNTIME / noisy phase estimate:
+  Target is not given directly. Estimate phase and target from noisy runtime IO.
+
+NO-ML NEGATIVE REJECTION:
+  Feed wrong order, wrong endpoint, over-jerk, and impossible IO.
+
+NO-ML CORRECTION:
+  Start a prediction buffer, inject a diverging runtime IO update, and verify
+  smooth adjust or re-anchor behavior.
+```
+
+The score that matters for real usefulness is the noisy runtime mode, not the
+known-target baseline.
